@@ -10,6 +10,8 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Expenses from "./pages/Expenses";
 import Reports from "./pages/Reports";
+import Invoices from "./pages/Invoices";
+import Taxes from "./pages/Taxes";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./components/layout/AppLayout";
 import ChatInterface from "./components/ai/ChatInterface";
@@ -41,8 +43,8 @@ const App = () => {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/reports" element={<Reports />} />
-              <Route path="/taxes" element={<Dashboard />} />
-              <Route path="/invoices" element={<Dashboard />} />
+              <Route path="/taxes/*" element={<Taxes />} />
+              <Route path="/invoices/*" element={<Invoices />} />
               <Route path="/ai-assistant" element={<ChatInterface />} />
               <Route path="/settings" element={<Dashboard />} />
               <Route path="/support" element={<Dashboard />} />
