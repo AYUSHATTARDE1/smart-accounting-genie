@@ -42,6 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CustomButton } from "@/components/ui/custom-button";
+import { useExpenses } from "@/hooks/use-expenses";
 
 // Sample expenses data
 interface Expense {
@@ -53,65 +54,6 @@ interface Expense {
   status: "approved" | "pending" | "rejected";
   receipt?: string;
 }
-
-const expenses: Expense[] = [
-  {
-    id: "exp-001",
-    date: "2023-08-15",
-    merchant: "Adobe Creative Cloud",
-    category: "Software",
-    amount: 52.99,
-    status: "approved",
-  },
-  {
-    id: "exp-002",
-    date: "2023-08-14",
-    merchant: "Office Depot",
-    category: "Office Supplies",
-    amount: 125.65,
-    status: "approved",
-  },
-  {
-    id: "exp-003",
-    date: "2023-08-10",
-    merchant: "AWS Cloud Services",
-    category: "Hosting",
-    amount: 215.30,
-    status: "approved",
-  },
-  {
-    id: "exp-004",
-    date: "2023-08-08",
-    merchant: "Delta Airlines",
-    category: "Travel",
-    amount: 450.00,
-    status: "approved",
-  },
-  {
-    id: "exp-005",
-    date: "2023-08-05",
-    merchant: "WeWork",
-    category: "Rent",
-    amount: 1250.00,
-    status: "approved",
-  },
-  {
-    id: "exp-006",
-    date: "2023-08-03",
-    merchant: "Uber",
-    category: "Transportation",
-    amount: 32.15,
-    status: "approved",
-  },
-  {
-    id: "exp-007",
-    date: "2023-08-01",
-    merchant: "Mailchimp",
-    category: "Marketing",
-    amount: 75.00,
-    status: "pending",
-  },
-];
 
 const categories = [
   { name: "Software", icon: Smartphone },
@@ -128,13 +70,68 @@ const Expenses = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [newExpense, setNewExpense] = useState({
+    merchant: "",
+    date: new Date().toISOString().split('T')[0],
+    amount: "",
+    category: "",
+  });
   const { toast } = useToast();
+  const { expenses, addExpense, deleteExpense, updateExpenseStatus } = useExpenses();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewExpense(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setNewExpense(prev => ({ ...prev, category: value }));
+  };
 
   const handleAddExpense = () => {
+    if (!newExpense.merchant || !newExpense.date || !newExpense.amount || !newExpense.category) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addExpense({
+      merchant: newExpense.merchant,
+      date: newExpense.date,
+      amount: parseFloat(newExpense.amount),
+      category: newExpense.category,
+    });
+
     setIsAddExpenseOpen(false);
+    setNewExpense({
+      merchant: "",
+      date: new Date().toISOString().split('T')[0],
+      amount: "",
+      category: "",
+    });
+
     toast({
       title: "Expense Added",
       description: "Your expense has been added successfully.",
+    });
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    deleteExpense(id);
+    toast({
+      title: "Expense Deleted",
+      description: "The expense has been removed.",
+    });
+  };
+
+  const handleUpdateStatus = (id: string, status: "approved" | "pending" | "rejected") => {
+    updateExpenseStatus(id, status);
+    toast({
+      title: "Status Updated",
+      description: `Expense status changed to ${status}.`,
     });
   };
 
@@ -186,25 +183,45 @@ const Expenses = () => {
                 <label className="text-right text-sm font-medium col-span-1">
                   Merchant
                 </label>
-                <Input className="col-span-3" placeholder="Enter merchant name" />
+                <Input 
+                  className="col-span-3" 
+                  placeholder="Enter merchant name" 
+                  name="merchant"
+                  value={newExpense.merchant}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium col-span-1">
                   Date
                 </label>
-                <Input className="col-span-3" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                <Input 
+                  className="col-span-3" 
+                  type="date" 
+                  name="date"
+                  value={newExpense.date}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium col-span-1">
                   Amount
                 </label>
-                <Input className="col-span-3" type="number" placeholder="0.00" step="0.01" />
+                <Input 
+                  className="col-span-3" 
+                  type="number" 
+                  placeholder="0.00" 
+                  step="0.01"
+                  name="amount"
+                  value={newExpense.amount}
+                  onChange={handleInputChange}
+                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label className="text-right text-sm font-medium col-span-1">
                   Category
                 </label>
-                <Select>
+                <Select value={newExpense.category} onValueChange={handleCategoryChange}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
@@ -327,7 +344,7 @@ const Expenses = () => {
                     <SelectValue placeholder="All categories" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All categories</SelectItem>
+                    <SelectItem value="all-categories">All categories</SelectItem>
                     {categories.map((category) => (
                       <SelectItem key={category.name} value={category.name}>
                         <div className="flex items-center">
@@ -432,6 +449,7 @@ const Expenses = () => {
                                 size="icon"
                                 variant="ghost"
                                 className="h-7 w-7 text-destructive"
+                                onClick={() => handleDeleteExpense(expense.id)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -458,24 +476,126 @@ const Expenses = () => {
         </TabsContent>
         <TabsContent value="pending" className="mt-4">
           <Card className="shadow-subtle border-border">
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">No pending expenses to review.</p>
+            <CardContent className="py-8">
+              {filteredExpenses.filter(exp => exp.status === "pending").length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Merchant</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExpenses
+                      .filter(exp => exp.status === "pending")
+                      .map((expense) => (
+                        <TableRow key={expense.id}>
+                          <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{expense.merchant}</TableCell>
+                          <TableCell>{expense.category}</TableCell>
+                          <TableCell className="text-right">${expense.amount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="mr-2"
+                              onClick={() => handleUpdateStatus(expense.id, "approved")}
+                            >
+                              Approve
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="text-destructive"
+                              onClick={() => handleUpdateStatus(expense.id, "rejected")}
+                            >
+                              Reject
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground">No pending expenses to review.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="approved" className="mt-4">
           <Card className="shadow-subtle border-border">
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">
-                View all your approved expenses here.
-              </p>
+            <CardContent className="py-8">
+              {filteredExpenses.filter(exp => exp.status === "approved").length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Merchant</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExpenses
+                      .filter(exp => exp.status === "approved")
+                      .map((expense) => (
+                        <TableRow key={expense.id}>
+                          <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{expense.merchant}</TableCell>
+                          <TableCell>{expense.category}</TableCell>
+                          <TableCell className="text-right">${expense.amount.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground">No approved expenses found.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="rejected" className="mt-4">
           <Card className="shadow-subtle border-border">
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">No rejected expenses found.</p>
+            <CardContent className="py-8">
+              {filteredExpenses.filter(exp => exp.status === "rejected").length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Merchant</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredExpenses
+                      .filter(exp => exp.status === "rejected")
+                      .map((expense) => (
+                        <TableRow key={expense.id}>
+                          <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{expense.merchant}</TableCell>
+                          <TableCell>{expense.category}</TableCell>
+                          <TableCell className="text-right">${expense.amount.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleUpdateStatus(expense.id, "approved")}
+                            >
+                              Approve
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground">No rejected expenses found.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
