@@ -12,66 +12,6 @@ export interface Expense {
   receipt?: string;
 }
 
-// Sample initial data
-const initialExpenses: Expense[] = [
-  {
-    id: "exp-001",
-    date: "2023-08-15",
-    merchant: "Adobe Creative Cloud",
-    category: "Software",
-    amount: 52.99,
-    status: "approved",
-  },
-  {
-    id: "exp-002",
-    date: "2023-08-14",
-    merchant: "Office Depot",
-    category: "Office Supplies",
-    amount: 125.65,
-    status: "approved",
-  },
-  {
-    id: "exp-003",
-    date: "2023-08-10",
-    merchant: "AWS Cloud Services",
-    category: "Hosting",
-    amount: 215.30,
-    status: "approved",
-  },
-  {
-    id: "exp-004",
-    date: "2023-08-08",
-    merchant: "Delta Airlines",
-    category: "Travel",
-    amount: 450.00,
-    status: "approved",
-  },
-  {
-    id: "exp-005",
-    date: "2023-08-05",
-    merchant: "WeWork",
-    category: "Rent",
-    amount: 1250.00,
-    status: "approved",
-  },
-  {
-    id: "exp-006",
-    date: "2023-08-03",
-    merchant: "Uber",
-    category: "Transportation",
-    amount: 32.15,
-    status: "approved",
-  },
-  {
-    id: "exp-007",
-    date: "2023-08-01",
-    merchant: "Mailchimp",
-    category: "Marketing",
-    amount: 75.00,
-    status: "pending",
-  },
-];
-
 interface NewExpense {
   merchant: string;
   date: string;
@@ -85,12 +25,10 @@ export const useExpenses = () => {
   
   useEffect(() => {
     // In a real app, this would be an API call to fetch expenses
-    // For now, we'll use our sample data
+    // For now, we'll use localStorage to persist data
     const savedExpenses = localStorage.getItem("expenses");
     if (savedExpenses) {
       setExpenses(JSON.parse(savedExpenses));
-    } else {
-      setExpenses(initialExpenses);
     }
   }, []);
 

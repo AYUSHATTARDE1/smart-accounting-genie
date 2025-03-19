@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "./use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
 
@@ -12,6 +12,7 @@ export interface InvoiceItem {
   quantity: number;
   unit_price: number;
   amount: number;
+  created_at?: string;
 }
 
 export interface Invoice {
@@ -26,6 +27,7 @@ export interface Invoice {
   notes?: string;
   items: InvoiceItem[];
   created_at?: string;
+  updated_at?: string;
 }
 
 export const useInvoices = () => {
@@ -39,18 +41,24 @@ export const useInvoices = () => {
     setError(null);
     
     try {
-      const { data, error } = await supabase
+      const { data: invoicesData, error: invoicesError } = await supabase
         .from("invoices")
         .select("*")
         .order("created_at", { ascending: false });
       
-      if (error) {
-        throw error;
+      if (invoicesError) {
+        throw invoicesError;
       }
       
-      // Fetch invoice items for each invoice
+      if (!invoicesData || invoicesData.length === 0) {
+        setInvoices([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Fetch items for each invoice
       const invoicesWithItems = await Promise.all(
-        data.map(async (invoice) => {
+        invoicesData.map(async (invoice) => {
           const { data: items, error: itemsError } = await supabase
             .from("invoice_items")
             .select("*")
@@ -104,28 +112,34 @@ export const useInvoices = () => {
           status: invoice.status,
           notes: invoice.notes,
         })
-        .select()
-        .single();
+        .select();
       
       if (error) {
         throw error;
       }
       
+      if (!data || data.length === 0) {
+        throw new Error("Failed to create invoice");
+      }
+      
+      const createdInvoice = data[0];
+      
       // Insert invoice items
-      if (invoice.items.length > 0) {
-        const items = invoice.items.map(item => ({
-          invoice_id: data.id,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          amount: item.amount,
-        }));
-        
+      if (invoice.items && invoice.items.length > 0) {
         const { error: itemsError } = await supabase
           .from("invoice_items")
-          .insert(items);
+          .insert(
+            invoice.items.map(item => ({
+              invoice_id: createdInvoice.id,
+              description: item.description,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              amount: item.amount,
+            }))
+          );
         
         if (itemsError) {
+          console.error("Error creating invoice items:", itemsError);
           throw itemsError;
         }
       }
@@ -193,18 +207,18 @@ export const useInvoices = () => {
       }
       
       // Insert updated items
-      if (invoice.items.length > 0) {
-        const items = invoice.items.map(item => ({
-          invoice_id: invoice.id,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          amount: item.amount,
-        }));
-        
+      if (invoice.items && invoice.items.length > 0) {
         const { error: itemsError } = await supabase
           .from("invoice_items")
-          .insert(items);
+          .insert(
+            invoice.items.map(item => ({
+              invoice_id: invoice.id,
+              description: item.description,
+              quantity: item.quantity,
+              unit_price: item.unit_price,
+              amount: item.amount,
+            }))
+          );
         
         if (itemsError) {
           throw itemsError;
@@ -212,8 +226,8 @@ export const useInvoices = () => {
       }
       
       toast({
-        title: "Success",
-        description: "Invoice updated successfully!",
+        title: "Success", 
+        description: "Invoice updated successfully!"
       });
       
       await fetchInvoices();
@@ -235,6 +249,7 @@ export const useInvoices = () => {
     setError(null);
     
     try {
+      // Delete invoice (cascade will delete items)
       const { error } = await supabase
         .from("invoices")
         .delete()

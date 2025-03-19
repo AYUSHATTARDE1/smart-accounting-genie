@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -125,7 +125,6 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
 
     try {
       const invoiceData: Invoice = {
-        ...data,
         client_name: data.client_name,
         invoice_number: data.invoice_number,
         issue_date: data.issue_date,
