@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowUp, Bot, User, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { useOpenAI } from "@/hooks/use-openai";
 
 interface Message {
   id: string;
@@ -30,6 +31,7 @@ const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { getAIResponse } = useOpenAI();
 
   useEffect(() => {
     scrollToBottom();
@@ -56,26 +58,28 @@ const ChatInterface = () => {
     setInput("");
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "Based on your spending patterns, you could save approximately $450 monthly by optimizing your subscriptions and utility expenses.",
-        "Your current tax efficiency score is 72/100. I've identified potential deductions in your business travel expenses that could save you $1,200 this quarter.",
-        "Looking at your cash flow, I recommend setting aside 8% more for your tax provisions this month to account for your recent freelance income.",
-        "I've analyzed your expense history, and your software subscription costs have increased by 32% since last year. Would you like me to suggest alternatives?",
-        "Your biggest expense category this month was marketing services at $2,340, which is 28% higher than your monthly average.",
-      ];
-
+    try {
+      // Get response from OpenAI
+      const aiResponse = await getAIResponse(input, messages);
+      
       const aiMessage: Message = {
         id: Date.now().toString(),
-        content: responses[Math.floor(Math.random() * responses.length)],
+        content: aiResponse,
         sender: "ai",
         timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get a response from the AI. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
