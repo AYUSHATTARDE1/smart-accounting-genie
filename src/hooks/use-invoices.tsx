@@ -58,10 +58,10 @@ export const useInvoices = () => {
           
           if (itemsError) {
             console.error("Error fetching invoice items:", itemsError);
-            return { ...invoice, items: [] };
+            return { ...invoice, items: [] } as Invoice;
           }
           
-          return { ...invoice, items: items || [] };
+          return { ...invoice, items: items || [] } as Invoice;
         })
       );
       
@@ -84,10 +84,18 @@ export const useInvoices = () => {
     setError(null);
     
     try {
+      // Get the user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
       // Insert invoice
       const { data, error } = await supabase
         .from("invoices")
         .insert({
+          user_id: user.id,
           client_name: invoice.client_name,
           invoice_number: invoice.invoice_number,
           issue_date: invoice.issue_date,
@@ -148,6 +156,13 @@ export const useInvoices = () => {
     setError(null);
     
     try {
+      // Get the user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
       // Update invoice
       const { error } = await supabase
         .from("invoices")

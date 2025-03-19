@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { useInvoices, Invoice, InvoiceItem } from "@/hooks/use-invoices";
+import { useInvoices, Invoice, InvoiceItem, InvoiceStatus } from "@/hooks/use-invoices";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -24,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { X, Plus, FileText, Save } from "lucide-react";
+import { X, Plus, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const invoiceSchema = z.object({
@@ -97,7 +96,6 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
       [field]: value,
     };
 
-    // Update amount when quantity or unit_price changes
     if (field === "quantity" || field === "unit_price") {
       const quantity = field === "quantity" 
         ? parseFloat(value as string) 
@@ -128,7 +126,13 @@ const InvoiceForm: React.FC<InvoiceFormProps> = ({
     try {
       const invoiceData: Invoice = {
         ...data,
-        items,
+        client_name: data.client_name,
+        invoice_number: data.invoice_number,
+        issue_date: data.issue_date,
+        due_date: data.due_date,
+        status: data.status as InvoiceStatus,
+        notes: data.notes,
+        items: items,
         total_amount: calculateTotal(),
       };
 

@@ -54,9 +54,17 @@ export const useTaxEntries = () => {
     setError(null);
     
     try {
+      // Get the user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
       const { data, error } = await supabase
         .from("tax_entries")
         .insert({
+          user_id: user.id,
           tax_year: entry.tax_year,
           category: entry.category,
           amount: entry.amount,
