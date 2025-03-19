@@ -31,10 +31,10 @@ const Index = () => {
             with our AI-powered assistant designed for businesses and individuals.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <CustomButton asChild size="lg" className="px-8 py-6 rounded-xl font-medium text-base">
+            <CustomButton size="lg" className="px-8 py-6 rounded-xl font-medium text-base">
               <Link to="/signup">Get Started for Free</Link>
             </CustomButton>
-            <Button asChild variant="outline" size="lg" className="rounded-xl font-medium text-base">
+            <Button variant="outline" size="lg" className="rounded-xl font-medium text-base">
               <Link to="/login" className="flex items-center">
                 Log In <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -134,7 +134,7 @@ const Index = () => {
             <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
               Join thousands of businesses and individuals who are saving time and money with CA AI.
             </p>
-            <CustomButton asChild size="lg" className="rounded-xl px-8 py-6 font-medium text-base">
+            <CustomButton size="lg" className="rounded-xl px-8 py-6 font-medium text-base">
               <Link to="/signup">Get Started for Free</Link>
             </CustomButton>
             <p className="mt-4 text-sm text-muted-foreground">

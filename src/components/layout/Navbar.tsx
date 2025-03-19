@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -28,13 +27,11 @@ const Navbar = ({ toggleSidebar, isSidebarOpen }: NavbarProps) => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
 
-  // Check if dark mode is enabled on initial load
   useEffect(() => {
     const isDark = document.documentElement.classList.contains("dark");
     setIsDarkMode(isDark);
   }, []);
 
-  // Handle scroll events to add shadow on scroll
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -44,7 +41,6 @@ const Navbar = ({ toggleSidebar, isSidebarOpen }: NavbarProps) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Toggle dark mode
   const toggleDarkMode = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
@@ -64,7 +60,6 @@ const Navbar = ({ toggleSidebar, isSidebarOpen }: NavbarProps) => {
     }
   };
 
-  // Get page title based on current route
   const getPageTitle = () => {
     switch (location.pathname) {
       case "/":
@@ -224,7 +219,6 @@ const Navbar = ({ toggleSidebar, isSidebarOpen }: NavbarProps) => {
                   variant="default" 
                   size="sm" 
                   className="animate-pulse"
-                  asChild
                 >
                   <Link to="/signup">Get Started</Link>
                 </CustomButton>
