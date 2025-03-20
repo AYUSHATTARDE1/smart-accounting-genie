@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
 
@@ -41,9 +43,18 @@ export const useInvoices = () => {
     setError(null);
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setInvoices([]);
+        setIsLoading(false);
+        return;
+      }
+      
       const { data: invoicesData, error: invoicesError } = await supabase
         .from("invoices")
         .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       
       if (invoicesError) {
@@ -69,7 +80,12 @@ export const useInvoices = () => {
             return { ...invoice, items: [] } as Invoice;
           }
           
-          return { ...invoice, items: items || [] } as Invoice;
+          return { 
+            ...invoice, 
+            items: items || [],
+            // Ensure status is a valid InvoiceStatus
+            status: invoice.status as InvoiceStatus
+          } as Invoice;
         })
       );
       
@@ -278,6 +294,83 @@ export const useInvoices = () => {
     }
   };
 
+  const downloadInvoiceAsPdf = (invoice: Invoice) => {
+    try {
+      const doc = new jsPDF();
+      
+      // Add company info
+      doc.setFontSize(20);
+      doc.setTextColor(40, 40, 40);
+      doc.text("My Bill Book", 14, 22);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Invoice #: " + invoice.invoice_number, 14, 32);
+      
+      // Add client info
+      doc.setFontSize(14);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Client:", 14, 45);
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(invoice.client_name, 14, 53);
+      
+      // Add dates
+      doc.setFontSize(12);
+      doc.text("Issue Date: " + new Date(invoice.issue_date).toLocaleDateString(), 150, 45);
+      doc.text("Due Date: " + new Date(invoice.due_date).toLocaleDateString(), 150, 53);
+      
+      // Add status
+      doc.setFontSize(12);
+      doc.text("Status: " + invoice.status.toUpperCase(), 150, 61);
+      
+      // Add items table
+      const tableColumn = ["Item", "Quantity", "Unit Price", "Amount"];
+      const tableRows = invoice.items.map(item => [
+        item.description,
+        item.quantity.toString(),
+        "$" + item.unit_price.toFixed(2),
+        "$" + item.amount.toFixed(2)
+      ]);
+      
+      // Add total row
+      tableRows.push([
+        "Total", "", "", "$" + invoice.total_amount.toFixed(2)
+      ]);
+      
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 70,
+        theme: 'grid',
+        styles: { fontSize: 10 }
+      });
+      
+      // Add notes if available
+      if (invoice.notes) {
+        const finalY = (doc as any).lastAutoTable.finalY + 10;
+        doc.text("Notes:", 14, finalY);
+        doc.setFontSize(10);
+        doc.text(invoice.notes, 14, finalY + 8);
+      }
+      
+      // Save the PDF
+      doc.save(`Invoice-${invoice.invoice_number}.pdf`);
+      
+      toast({
+        title: "Success",
+        description: "Invoice downloaded as PDF!",
+      });
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      toast({
+        title: "Error",
+        description: "Failed to download invoice as PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchInvoices();
   }, []);
@@ -290,5 +383,6 @@ export const useInvoices = () => {
     createInvoice,
     updateInvoice,
     deleteInvoice,
+    downloadInvoiceAsPdf,
   };
 };

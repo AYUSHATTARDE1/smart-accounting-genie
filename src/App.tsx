@@ -12,6 +12,7 @@ import Expenses from "./pages/Expenses";
 import Reports from "./pages/Reports";
 import Invoices from "./pages/Invoices";
 import Taxes from "./pages/Taxes";
+import GetStarted from "./pages/GetStarted";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./components/layout/AppLayout";
 import ChatInterface from "./components/ai/ChatInterface";
@@ -37,6 +38,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Login />} />
+            <Route path="/get-started" element={<GetStarted />} />
             
             {/* Protected routes - wrapped in AppLayout */}
             <Route element={<AppLayout />}>

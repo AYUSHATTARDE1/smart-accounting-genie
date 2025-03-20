@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./use-toast";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export interface TaxEntry {
   id?: string;
@@ -26,9 +28,18 @@ export const useTaxEntries = () => {
     setError(null);
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setTaxEntries([]);
+        setIsLoading(false);
+        return;
+      }
+      
       const { data, error } = await supabase
         .from("tax_entries")
         .select("*")
+        .eq("user_id", user.id)
         .order("date_added", { ascending: false });
       
       if (error) {
@@ -171,6 +182,101 @@ export const useTaxEntries = () => {
     }
   };
 
+  const downloadTaxReportAsPdf = (year?: number) => {
+    try {
+      let entriesToDownload = taxEntries;
+      
+      if (year) {
+        entriesToDownload = taxEntries.filter(entry => entry.tax_year === year);
+      }
+      
+      if (entriesToDownload.length === 0) {
+        toast({
+          title: "No Data",
+          description: "There are no tax entries to download.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(20);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`Tax Report ${year ? '- ' + year : ''}`, 14, 22);
+      
+      // Group entries by category
+      const entriesByCategory: Record<string, TaxEntry[]> = {};
+      entriesToDownload.forEach(entry => {
+        if (!entriesByCategory[entry.category]) {
+          entriesByCategory[entry.category] = [];
+        }
+        entriesByCategory[entry.category].push(entry);
+      });
+      
+      // Calculate category totals
+      const categoryTotals: Record<string, number> = {};
+      Object.entries(entriesByCategory).forEach(([category, entries]) => {
+        categoryTotals[category] = entries.reduce((sum, entry) => sum + entry.amount, 0);
+      });
+      
+      // Add entries table
+      const tableColumn = ["Date", "Category", "Description", "Amount"];
+      const tableRows = entriesToDownload.map(entry => [
+        new Date(entry.date_added).toLocaleDateString(),
+        entry.category,
+        entry.description || "",
+        "$" + entry.amount.toFixed(2)
+      ]);
+      
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 30,
+        theme: 'grid',
+        styles: { fontSize: 10 }
+      });
+      
+      // Add category summary
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      doc.text("Category Summary", 14, finalY);
+      
+      const summaryColumn = ["Category", "Total Amount"];
+      const summaryRows = Object.entries(categoryTotals).map(([category, total]) => [
+        category,
+        "$" + total.toFixed(2)
+      ]);
+      
+      // Add grand total
+      const grandTotal = Object.values(categoryTotals).reduce((sum, total) => sum + total, 0);
+      summaryRows.push(["GRAND TOTAL", "$" + grandTotal.toFixed(2)]);
+      
+      autoTable(doc, {
+        head: [summaryColumn],
+        body: summaryRows,
+        startY: finalY + 5,
+        theme: 'grid',
+        styles: { fontSize: 10 }
+      });
+      
+      // Save the PDF
+      doc.save(`Tax-Report${year ? '-' + year : ''}.pdf`);
+      
+      toast({
+        title: "Success",
+        description: "Tax report downloaded as PDF!",
+      });
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      toast({
+        title: "Error",
+        description: "Failed to download tax report as PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchTaxEntries();
   }, []);
@@ -183,5 +289,6 @@ export const useTaxEntries = () => {
     createTaxEntry,
     updateTaxEntry,
     deleteTaxEntry,
+    downloadTaxReportAsPdf,
   };
 };
