@@ -10,6 +10,7 @@ const TaxesPage = () => {
       <Routes>
         <Route path="/" element={<TaxEntryList />} />
         <Route path="/new" element={<TaxEntryForm />} />
+        <Route path="/edit/:id" element={<TaxEntryForm />} />
         <Route path="*" element={<Navigate to="/taxes" replace />} />
       </Routes>
     </div>

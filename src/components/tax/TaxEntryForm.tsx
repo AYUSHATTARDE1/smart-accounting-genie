@@ -1,10 +1,10 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { TaxEntry, useTaxEntries } from "@/hooks/use-tax-entries";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const TAX_CATEGORIES = [
   "Business Expenses",
@@ -60,19 +61,32 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
   onSuccess 
 }) => {
   const navigate = useNavigate();
-  const { createTaxEntry, updateTaxEntry } = useTaxEntries();
+  const params = useParams();
+  const { createTaxEntry, updateTaxEntry, taxEntries } = useTaxEntries();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [entryData, setEntryData] = useState<TaxEntry | undefined>(initialData);
+  const { toast } = useToast();
 
   const currentYear = new Date().getFullYear();
   
+  // If we have an ID parameter, find the corresponding tax entry
+  useEffect(() => {
+    if (params.id && taxEntries.length > 0) {
+      const entry = taxEntries.find(entry => entry.id === params.id);
+      if (entry) {
+        setEntryData(entry);
+      }
+    }
+  }, [params.id, taxEntries]);
+  
   const form = useForm<TaxEntryFormValues>({
     resolver: zodResolver(taxEntrySchema),
-    defaultValues: initialData ? {
-      tax_year: initialData.tax_year,
-      category: initialData.category,
-      amount: initialData.amount,
-      description: initialData.description || "",
-      date_added: initialData.date_added,
+    defaultValues: entryData ? {
+      tax_year: entryData.tax_year,
+      category: entryData.category,
+      amount: entryData.amount,
+      description: entryData.description || "",
+      date_added: entryData.date_added,
     } : {
       tax_year: currentYear,
       category: "",
@@ -81,12 +95,25 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
       date_added: format(new Date(), "yyyy-MM-dd"),
     },
   });
+  
+  // Update form values when entryData changes
+  useEffect(() => {
+    if (entryData) {
+      form.reset({
+        tax_year: entryData.tax_year,
+        category: entryData.category,
+        amount: entryData.amount,
+        description: entryData.description || "",
+        date_added: entryData.date_added,
+      });
+    }
+  }, [entryData, form]);
 
   const onSubmit = async (data: TaxEntryFormValues) => {
     setIsSubmitting(true);
 
     try {
-      const entryData: TaxEntry = {
+      const taxEntryData: TaxEntry = {
         tax_year: data.tax_year,
         category: data.category,
         amount: data.amount,
@@ -94,10 +121,18 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
         date_added: data.date_added,
       };
 
-      if (initialData?.id) {
-        await updateTaxEntry({ ...entryData, id: initialData.id });
+      if (entryData?.id) {
+        await updateTaxEntry({ ...taxEntryData, id: entryData.id });
+        toast({
+          title: "Success",
+          description: "Tax entry updated successfully!",
+        });
       } else {
-        await createTaxEntry(entryData);
+        await createTaxEntry(taxEntryData);
+        toast({
+          title: "Success",
+          description: "Tax entry created successfully!",
+        });
       }
 
       if (onSuccess) {
@@ -107,6 +142,11 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
       }
     } catch (error) {
       console.error("Error saving tax entry:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save tax entry. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -129,7 +169,8 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
                     max="2100" 
                     placeholder="2023" 
                     {...field} 
-                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                    onChange={(e) => field.onChange(parseInt(e.target.value) || currentYear)}
+                    value={field.value}
                   />
                 </FormControl>
                 <FormMessage />
@@ -159,7 +200,7 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
               <FormLabel>Category</FormLabel>
               <Select
                 onValueChange={field.onChange}
-                defaultValue={field.value}
+                value={field.value}
               >
                 <FormControl>
                   <SelectTrigger>
@@ -192,7 +233,8 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
                   min="0" 
                   placeholder="0.00" 
                   {...field} 
-                  onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                  value={field.value}
                 />
               </FormControl>
               <FormMessage />
@@ -230,7 +272,10 @@ const TaxEntryForm: React.FC<TaxEntryFormProps> = ({
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <>Saving...</>
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Saving...
+              </>
             ) : (
               <>
                 <Save size={16} />

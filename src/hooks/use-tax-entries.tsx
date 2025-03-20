@@ -31,7 +31,35 @@ export const useTaxEntries = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        setTaxEntries([]);
+        // For demo purposes, create some sample data if not authenticated
+        const demoData: TaxEntry[] = [
+          {
+            id: "demo-1",
+            tax_year: 2023,
+            category: "Business Expenses",
+            amount: 1250.00,
+            description: "Office supplies and equipment",
+            date_added: "2023-06-15",
+          },
+          {
+            id: "demo-2",
+            tax_year: 2023,
+            category: "Healthcare",
+            amount: 850.50,
+            description: "Medical expenses",
+            date_added: "2023-08-22",
+          },
+          {
+            id: "demo-3",
+            tax_year: 2022,
+            category: "Charitable Donations",
+            amount: 500.00,
+            description: "Annual donation to local charity",
+            date_added: "2022-12-20",
+          }
+        ];
+        
+        setTaxEntries(demoData);
         setIsLoading(false);
         return;
       }
@@ -69,7 +97,22 @@ export const useTaxEntries = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        throw new Error("User not authenticated");
+        // For demo: simulate creation and return
+        const newEntry: TaxEntry = {
+          ...entry,
+          id: `demo-${Date.now()}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        setTaxEntries([newEntry, ...taxEntries]);
+        
+        toast({
+          title: "Demo Mode",
+          description: "Tax entry added (demo mode - not saved to database)",
+        });
+        
+        return newEntry;
       }
       
       const { data, error } = await supabase
@@ -94,6 +137,7 @@ export const useTaxEntries = () => {
       });
       
       await fetchTaxEntries();
+      return data[0];
     } catch (err) {
       console.error("Error creating tax entry:", err);
       setError("Failed to create tax entry. Please try again.");
@@ -102,6 +146,7 @@ export const useTaxEntries = () => {
         description: "Failed to create tax entry. Please try again.",
         variant: "destructive",
       });
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +159,22 @@ export const useTaxEntries = () => {
     setError(null);
     
     try {
+      // For demo mode
+      if (entry.id.startsWith('demo-')) {
+        const updatedEntries = taxEntries.map(e => 
+          e.id === entry.id ? { ...entry, updated_at: new Date().toISOString() } : e
+        );
+        
+        setTaxEntries(updatedEntries);
+        
+        toast({
+          title: "Demo Mode",
+          description: "Tax entry updated (demo mode - not saved to database)",
+        });
+        
+        return;
+      }
+      
       const { error } = await supabase
         .from("tax_entries")
         .update({
@@ -144,6 +205,7 @@ export const useTaxEntries = () => {
         description: "Failed to update tax entry. Please try again.",
         variant: "destructive",
       });
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -154,6 +216,18 @@ export const useTaxEntries = () => {
     setError(null);
     
     try {
+      // For demo mode
+      if (id.startsWith('demo-')) {
+        setTaxEntries(taxEntries.filter(entry => entry.id !== id));
+        
+        toast({
+          title: "Demo Mode",
+          description: "Tax entry deleted (demo mode)",
+        });
+        
+        return;
+      }
+      
       const { error } = await supabase
         .from("tax_entries")
         .delete()
@@ -177,6 +251,7 @@ export const useTaxEntries = () => {
         description: "Failed to delete tax entry. Please try again.",
         variant: "destructive",
       });
+      throw err;
     } finally {
       setIsLoading(false);
     }
