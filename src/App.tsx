@@ -13,6 +13,7 @@ import Reports from "./pages/Reports";
 import Invoices from "./pages/Invoices";
 import Taxes from "./pages/Taxes";
 import GetStarted from "./pages/GetStarted";
+import Calculator from "./pages/Calculator";
 import DocumentUpload from "./pages/DocumentUpload";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./components/layout/AppLayout";
@@ -40,6 +41,7 @@ const App = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Login />} />
             <Route path="/get-started" element={<GetStarted />} />
+            <Route path="/calculator" element={<Calculator />} />
             <Route path="/document-upload" element={<DocumentUpload />} />
             
             {/* Protected routes - wrapped in AppLayout */}

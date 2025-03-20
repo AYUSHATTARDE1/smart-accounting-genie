@@ -112,6 +112,11 @@ export const useInvoices = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please login to create invoices",
+          variant: "destructive",
+        });
         throw new Error("User not authenticated");
       }
       
