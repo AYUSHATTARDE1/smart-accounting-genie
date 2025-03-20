@@ -32,6 +32,10 @@ export interface Invoice {
   updated_at?: string;
 }
 
+// Demo data for local usage
+const DEMO_USER_ID = "00000000-0000-0000-0000-000000000000";
+const DEMO_MODE = true; // Set to true to enable demo mode without authentication
+
 export const useInvoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,18 +47,24 @@ export const useInvoices = () => {
     setError(null);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      let userId = DEMO_USER_ID;
       
-      if (!user) {
-        setInvoices([]);
-        setIsLoading(false);
-        return;
+      if (!DEMO_MODE) {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          setInvoices([]);
+          setIsLoading(false);
+          return;
+        }
+        
+        userId = user.id;
       }
       
       const { data: invoicesData, error: invoicesError } = await supabase
         .from("invoices")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
       
       if (invoicesError) {
@@ -108,23 +118,29 @@ export const useInvoices = () => {
     setError(null);
     
     try {
-      // Get the user ID
-      const { data: { user } } = await supabase.auth.getUser();
+      let userId = DEMO_USER_ID;
       
-      if (!user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please login to create invoices",
-          variant: "destructive",
-        });
-        throw new Error("User not authenticated");
+      if (!DEMO_MODE) {
+        // Get the user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          toast({
+            title: "Authentication Required",
+            description: "Please login to create invoices",
+            variant: "destructive",
+          });
+          throw new Error("User not authenticated");
+        }
+        
+        userId = user.id;
       }
       
       // Insert invoice
       const { data, error } = await supabase
         .from("invoices")
         .insert({
-          user_id: user.id,
+          user_id: userId,
           client_name: invoice.client_name,
           invoice_number: invoice.invoice_number,
           issue_date: invoice.issue_date,
@@ -191,11 +207,17 @@ export const useInvoices = () => {
     setError(null);
     
     try {
-      // Get the user ID
-      const { data: { user } } = await supabase.auth.getUser();
+      let userId = DEMO_USER_ID;
       
-      if (!user) {
-        throw new Error("User not authenticated");
+      if (!DEMO_MODE) {
+        // Get the user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+        
+        userId = user.id;
       }
       
       // Update invoice
