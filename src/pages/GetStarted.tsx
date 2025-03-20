@@ -26,7 +26,7 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  FileUpload, 
+  Upload, 
   FileText, 
   ArrowRight, 
   Building, 
@@ -321,7 +321,7 @@ const GetStarted = () => {
           {step === 2 && (
             <div className="space-y-6">
               <div className="bg-muted/40 rounded-lg p-6 text-center">
-                <FileUpload className="h-12 w-12 mx-auto mb-4 text-primary" />
+                <Upload className="h-12 w-12 mx-auto mb-4 text-primary" />
                 <h3 className="text-lg font-medium mb-2">Upload Your Documents</h3>
                 <p className="text-muted-foreground mb-4">
                   Upload receipts, invoices, or other financial documents to get started.

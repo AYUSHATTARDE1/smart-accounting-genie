@@ -48,7 +48,18 @@ export const useExpenses = () => {
         throw fetchError;
       }
       
-      setExpenses(data || []);
+      // Transform the data to match the Expense type
+      const transformedData = data?.map((item: any) => ({
+        id: item.id,
+        date: item.date,
+        merchant: item.merchant,
+        category: item.category,
+        amount: item.amount,
+        status: item.status as "approved" | "pending" | "rejected",
+        receipt: item.receipt
+      })) || [];
+      
+      setExpenses(transformedData);
     } catch (err) {
       console.error("Error fetching expenses:", err);
       setError("Failed to load expenses");

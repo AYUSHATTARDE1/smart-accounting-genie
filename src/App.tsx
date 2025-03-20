@@ -13,6 +13,7 @@ import Reports from "./pages/Reports";
 import Invoices from "./pages/Invoices";
 import Taxes from "./pages/Taxes";
 import GetStarted from "./pages/GetStarted";
+import DocumentUpload from "./pages/DocumentUpload";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./components/layout/AppLayout";
 import ChatInterface from "./components/ai/ChatInterface";
@@ -39,6 +40,7 @@ const App = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Login />} />
             <Route path="/get-started" element={<GetStarted />} />
+            <Route path="/document-upload" element={<DocumentUpload />} />
             
             {/* Protected routes - wrapped in AppLayout */}
             <Route element={<AppLayout />}>
