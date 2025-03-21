@@ -9,24 +9,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Save, LogOut } from "lucide-react";
-
-interface BusinessProfile {
-  id?: string;
-  user_id?: string;
-  business_name: string;
-  business_type: string;
-  address: string;
-  email: string;
-  phone: string;
-  tax_id: string;
-}
+import { Save, LogOut, Upload, Image as ImageIcon } from "lucide-react";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 
 const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [profile, setProfile] = useState<BusinessProfile>({
+  const { settings, isLoading: settingsLoading, saveSettings, uploadLogo } = useCompanySettings();
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [profile, setProfile] = useState({
     business_name: "",
     business_type: "sole-proprietorship",
     address: "",
@@ -38,6 +31,12 @@ const Settings = () => {
   useEffect(() => {
     fetchBusinessProfile();
   }, []);
+
+  useEffect(() => {
+    if (settings) {
+      setLogoPreview(settings.company_logo_url || null);
+    }
+  }, [settings]);
 
   const fetchBusinessProfile = async () => {
     setIsLoading(true);
@@ -61,8 +60,6 @@ const Settings = () => {
       
       if (data) {
         setProfile({
-          id: data.id,
-          user_id: data.user_id,
           business_name: data.business_name,
           business_type: data.business_type,
           address: data.address || "",
@@ -70,6 +67,10 @@ const Settings = () => {
           phone: data.phone || "",
           tax_id: data.tax_id || "",
         });
+        
+        if (data.logo_url) {
+          setLogoPreview(data.logo_url);
+        }
       }
     } catch (error) {
       console.error("Error fetching business profile:", error);
@@ -83,8 +84,22 @@ const Settings = () => {
     }
   };
 
-  const handleChange = (field: keyof BusinessProfile, value: string) => {
+  const handleChange = (field: string, value: string) => {
     setProfile(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setLogoFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setLogoPreview(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,40 +129,25 @@ const Settings = () => {
         return;
       }
       
-      const profileData = {
-        user_id: user.id,
-        business_name: profile.business_name,
-        business_type: profile.business_type,
+      // Upload logo if changed
+      let logoUrl = settings?.company_logo_url || null;
+      if (logoFile) {
+        logoUrl = await uploadLogo(logoFile);
+      }
+      
+      await saveSettings({
+        company_name: profile.business_name,
+        company_logo_url: logoUrl || undefined,
         address: profile.address,
         email: profile.email,
         phone: profile.phone,
         tax_id: profile.tax_id,
-      };
-      
-      let result;
-      
-      if (profile.id) {
-        // Update existing profile
-        result = await supabase
-          .from("business_profiles")
-          .update(profileData)
-          .eq("id", profile.id);
-      } else {
-        // Insert new profile
-        result = await supabase
-          .from("business_profiles")
-          .insert(profileData);
-      }
-      
-      if (result.error) {
-        throw result.error;
-      }
+      });
       
       toast({
         title: "Profile saved",
         description: "Your business profile has been updated successfully.",
       });
-      
     } catch (error) {
       console.error("Error saving business profile:", error);
       toast({
@@ -201,6 +201,44 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-4">
+                  <Label htmlFor="logo">Company Logo</Label>
+                  <div className="flex flex-col items-center space-y-4 p-6 border-2 border-dashed rounded-md">
+                    {logoPreview ? (
+                      <div className="relative w-32 h-32 mb-2">
+                        <img 
+                          src={logoPreview} 
+                          alt="Company logo" 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-32 h-32 bg-gray-100 rounded-md flex items-center justify-center">
+                        <ImageIcon className="w-12 h-12 text-gray-400" />
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <Label 
+                        htmlFor="logo-upload" 
+                        className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                      >
+                        <Upload className="mr-2 h-4 w-4" /> Upload Logo
+                      </Label>
+                      <Input 
+                        id="logo-upload" 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleLogoChange}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Upload a logo to display on invoices and documents. <br />
+                      Recommended size: 300x200 pixels, max 2MB.
+                    </p>
+                  </div>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="businessName">Business Name <span className="text-red-500">*</span></Label>

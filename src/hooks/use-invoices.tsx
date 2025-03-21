@@ -1,8 +1,10 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue";
 
@@ -40,6 +42,7 @@ export const useInvoices = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { settings, fetchSettings } = useCompanySettings();
 
   const fetchInvoices = async () => {
     setIsLoading(true);
@@ -314,65 +317,236 @@ export const useInvoices = () => {
     }
   };
 
-  const downloadInvoiceAsPdf = (invoice: Invoice) => {
+  const downloadInvoiceAsPdf = async (invoice: Invoice) => {
     try {
+      // Ensure we have the latest company settings
+      await fetchSettings();
+      
+      // Create a new PDF document
       const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Set document properties
+      doc.setProperties({
+        title: `Invoice ${invoice.invoice_number}`,
+        subject: 'Invoice',
+        author: settings?.company_name || 'My Bill Book',
+        keywords: 'invoice, bill',
+        creator: 'My Bill Book'
+      });
+      
+      // Define colors
+      const primaryColor = '#9b87f5';
+      const secondaryColor = '#6E59A5';
+      const textColor = '#1A1F2C';
+      const mutedColor = '#8E9196';
+      
+      // Add logo and styling
+      doc.setFillColor(primaryColor);
+      doc.rect(0, 0, pageWidth, 40, 'F');
+      
+      // Add company logo if available
+      if (settings?.company_logo_url) {
+        // Create an image element to get dimensions
+        const img = new Image();
+        img.src = settings.company_logo_url;
+        
+        // Wait for image to load
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          // Set a timeout in case the image fails to load
+          setTimeout(resolve, 3000);
+        });
+        
+        // Calculate dimensions to maintain aspect ratio
+        const maxWidth = 50;
+        const maxHeight = 30;
+        
+        let imgWidth = img.width;
+        let imgHeight = img.height;
+        
+        if (imgWidth > maxWidth) {
+          const ratio = maxWidth / imgWidth;
+          imgWidth = maxWidth;
+          imgHeight = imgHeight * ratio;
+        }
+        
+        if (imgHeight > maxHeight) {
+          const ratio = maxHeight / imgHeight;
+          imgHeight = maxHeight;
+          imgWidth = imgWidth * ratio;
+        }
+        
+        // Add logo to PDF
+        doc.addImage(
+          settings.company_logo_url, 
+          'JPEG', 
+          10, 
+          5, 
+          imgWidth, 
+          imgHeight
+        );
+      }
       
       // Add company info
-      doc.setFontSize(20);
-      doc.setTextColor(40, 40, 40);
-      doc.text("My Bill Book", 14, 22);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.text(settings?.company_name || 'My Bill Book', settings?.company_logo_url ? 65 : 14, 20);
       
       doc.setFontSize(12);
-      doc.setTextColor(100, 100, 100);
-      doc.text("Invoice #: " + invoice.invoice_number, 14, 32);
+      doc.setFont('helvetica', 'normal');
+      doc.text('INVOICE', pageWidth - 20, 20, { align: 'right' });
       
-      // Add client info
-      doc.setFontSize(14);
-      doc.setTextColor(40, 40, 40);
-      doc.text("Client:", 14, 45);
-      doc.setFontSize(12);
-      doc.setTextColor(100, 100, 100);
-      doc.text(invoice.client_name, 14, 53);
+      // Add invoice details section
+      const startY = 50;
       
-      // Add dates
-      doc.setFontSize(12);
-      doc.text("Issue Date: " + new Date(invoice.issue_date).toLocaleDateString(), 150, 45);
-      doc.text("Due Date: " + new Date(invoice.due_date).toLocaleDateString(), 150, 53);
+      // Invoice number and dates
+      doc.setTextColor(textColor);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Invoice #: ${invoice.invoice_number}`, 14, startY);
       
-      // Add status
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mutedColor);
+      doc.text(`Issue Date: ${new Date(invoice.issue_date).toLocaleDateString()}`, 14, startY + 10);
+      doc.text(`Due Date: ${new Date(invoice.due_date).toLocaleDateString()}`, 14, startY + 18);
+      
+      // Status badge
+      doc.setFillColor(getStatusColor(invoice.status));
+      doc.roundedRect(pageWidth - 60, startY - 5, 50, 15, 3, 3, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(
+        invoice.status.toUpperCase(), 
+        pageWidth - 35, 
+        startY + 3, 
+        { align: 'center' }
+      );
+      
+      // Bill to section
+      const billToY = startY + 30;
+      doc.setTextColor(secondaryColor);
       doc.setFontSize(12);
-      doc.text("Status: " + invoice.status.toUpperCase(), 150, 61);
+      doc.setFont('helvetica', 'bold');
+      doc.text('BILL TO', 14, billToY);
+      
+      doc.setTextColor(textColor);
+      doc.setFontSize(11);
+      doc.text(invoice.client_name, 14, billToY + 10);
+      
+      // From section
+      doc.setTextColor(secondaryColor);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('FROM', pageWidth - 90, billToY);
+      
+      doc.setTextColor(textColor);
+      doc.setFontSize(11);
+      doc.text(settings?.company_name || 'My Company', pageWidth - 90, billToY + 10);
+      
+      if (settings?.address) {
+        doc.setFontSize(9);
+        doc.text(settings.address, pageWidth - 90, billToY + 18);
+      }
+      
+      if (settings?.email) {
+        doc.setFontSize(9);
+        doc.text(settings.email, pageWidth - 90, billToY + 26);
+      }
+      
+      if (settings?.phone) {
+        doc.setFontSize(9);
+        doc.text(settings.phone, pageWidth - 90, billToY + 34);
+      }
       
       // Add items table
-      const tableColumn = ["Item", "Quantity", "Unit Price", "Amount"];
+      const tableStartY = billToY + 50;
+      
+      const tableColumn = [
+        "Item Description", 
+        "Quantity", 
+        "Unit Price", 
+        "Amount"
+      ];
+      
       const tableRows = invoice.items.map(item => [
         item.description,
         item.quantity.toString(),
-        "$" + item.unit_price.toFixed(2),
-        "$" + item.amount.toFixed(2)
+        `$${item.unit_price.toFixed(2)}`,
+        `$${item.amount.toFixed(2)}`
       ]);
       
-      // Add total row
-      tableRows.push([
-        "Total", "", "", "$" + invoice.total_amount.toFixed(2)
-      ]);
-      
+      // Configure the table
       autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
-        startY: 70,
+        startY: tableStartY,
         theme: 'grid',
-        styles: { fontSize: 10 }
+        headStyles: {
+          fillColor: [110, 89, 165],
+          fontStyle: 'bold',
+          halign: 'left'
+        },
+        columnStyles: {
+          0: { cellWidth: 'auto' },
+          1: { cellWidth: 30, halign: 'center' },
+          2: { cellWidth: 40, halign: 'right' },
+          3: { cellWidth: 40, halign: 'right' }
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 5
+        },
       });
+      
+      // Get the final Y position after the table is rendered
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      
+      // Total section
+      doc.setFillColor(245, 245, 245);
+      doc.rect(pageWidth - 100, finalY, 90, 20, 'F');
+      
+      doc.setTextColor(textColor);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Amount:', pageWidth - 90, finalY + 13);
+      
+      doc.setTextColor(primaryColor);
+      doc.setFontSize(14);
+      doc.text(
+        `$${invoice.total_amount.toFixed(2)}`, 
+        pageWidth - 10, 
+        finalY + 13, 
+        { align: 'right' }
+      );
       
       // Add notes if available
       if (invoice.notes) {
-        const finalY = (doc as any).lastAutoTable.finalY + 10;
-        doc.text("Notes:", 14, finalY);
+        const notesY = finalY + 40;
+        doc.setTextColor(secondaryColor);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('NOTES', 14, notesY);
+        
+        doc.setTextColor(textColor);
         doc.setFontSize(10);
-        doc.text(invoice.notes, 14, finalY + 8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(invoice.notes, 14, notesY + 10);
       }
+      
+      // Add footer
+      const footerY = doc.internal.pageSize.getHeight() - 10;
+      doc.setTextColor(mutedColor);
+      doc.setFontSize(8);
+      doc.text(
+        `${settings?.company_name || 'My Bill Book'} - Invoice #${invoice.invoice_number}`, 
+        pageWidth / 2, 
+        footerY, 
+        { align: 'center' }
+      );
       
       // Save the PDF
       doc.save(`Invoice-${invoice.invoice_number}.pdf`);
@@ -388,6 +562,19 @@ export const useInvoices = () => {
         description: "Failed to download invoice as PDF. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+  
+  const getStatusColor = (status: string): number[] => {
+    switch (status.toLowerCase()) {
+      case "paid":
+        return [39, 174, 96]; // Green
+      case "sent":
+        return [41, 128, 185]; // Blue
+      case "overdue":
+        return [192, 57, 43]; // Red
+      default:
+        return [149, 165, 166]; // Gray
     }
   };
 

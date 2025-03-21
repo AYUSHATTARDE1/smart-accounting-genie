@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Edit, Eye, FileText, Plus } from "lucide-react";
+import { Trash2, Edit, Eye, FileText, Plus, Download } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -31,7 +31,7 @@ import InvoiceForm from "./InvoiceForm";
 import InvoiceView from "./InvoiceView";
 
 const InvoiceList = () => {
-  const { invoices, isLoading, deleteInvoice } = useInvoices();
+  const { invoices, isLoading, deleteInvoice, downloadInvoiceAsPdf } = useInvoices();
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [viewMode, setViewMode] = useState<"view" | "edit" | null>(null);
   const navigate = useNavigate();
@@ -50,6 +50,10 @@ const InvoiceList = () => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
       await deleteInvoice(id);
     }
+  };
+
+  const handleDownload = (invoice: Invoice) => {
+    downloadInvoiceAsPdf(invoice);
   };
 
   const getStatusColor = (status: string) => {
@@ -192,6 +196,14 @@ const InvoiceList = () => {
                             )}
                           </SheetContent>
                         </Sheet>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDownload(invoice)}
+                        >
+                          <Download size={16} />
+                          <span className="sr-only">Download</span>
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

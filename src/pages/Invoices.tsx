@@ -7,6 +7,7 @@ import { useInvoices } from "@/hooks/use-invoices";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
+import { useCompanySettings } from "@/hooks/use-company-settings";
 
 // Create a shared authentication hook to avoid duplicate code
 const useAuthCheck = () => {
@@ -14,6 +15,7 @@ const useAuthCheck = () => {
   const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { fetchSettings } = useCompanySettings();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -30,12 +32,14 @@ const useAuthCheck = () => {
         setIsAuthenticated(false);
       } else {
         setIsAuthenticated(true);
+        // Fetch company settings when user is authenticated
+        await fetchSettings();
       }
       setIsLoading(false);
     };
     
     checkAuth();
-  }, [navigate, toast]);
+  }, [navigate, toast, fetchSettings]);
 
   return { isAuthenticated, isLoading };
 };
