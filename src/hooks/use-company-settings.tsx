@@ -13,6 +13,7 @@ export interface CompanySettings {
   email?: string;
   phone?: string;
   tax_id?: string;
+  business_type?: string;
 }
 
 export const useCompanySettings = () => {
@@ -50,6 +51,7 @@ export const useCompanySettings = () => {
         email: data.email || "",
         phone: data.phone || "",
         tax_id: data.tax_id || "",
+        business_type: data.business_type || ""
       } : null);
       
       return data;
@@ -132,6 +134,7 @@ export const useCompanySettings = () => {
         email: updatedSettings.email,
         phone: updatedSettings.phone,
         tax_id: updatedSettings.tax_id,
+        business_type: updatedSettings.business_type || "sole-proprietorship" // Set default value
       };
       
       let result;

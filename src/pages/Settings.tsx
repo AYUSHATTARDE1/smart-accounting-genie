@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,6 +141,7 @@ const Settings = () => {
         email: profile.email,
         phone: profile.phone,
         tax_id: profile.tax_id,
+        business_type: profile.business_type,
       });
       
       toast({
