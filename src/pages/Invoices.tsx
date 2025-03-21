@@ -1,40 +1,59 @@
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import InvoiceForm from "@/components/invoices/InvoiceForm";
 import { useInvoices } from "@/hooks/use-invoices";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
 
-const EditInvoice = () => {
-  const { id } = useParams();
-  const { invoices, isLoading } = useInvoices();
+// Create a shared authentication hook to avoid duplicate code
+const useAuthCheck = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  // Find the invoice with the matching ID
-  const invoice = invoices.find(inv => inv.id === id);
-  
-  // Check if user is authenticated
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
     const checkAuth = async () => {
+      setIsLoading(true);
       const { data } = await supabase.auth.getSession();
+      
       if (!data.session) {
         toast({
           title: "Authentication required",
-          description: "Please log in to access invoices.",
+          description: "Please log in to access this feature.",
           variant: "destructive",
         });
         navigate('/login');
+        setIsAuthenticated(false);
+      } else {
+        setIsAuthenticated(true);
       }
+      setIsLoading(false);
     };
     
     checkAuth();
   }, [navigate, toast]);
+
+  return { isAuthenticated, isLoading };
+};
+
+const EditInvoice = () => {
+  const { id } = useParams();
+  const { invoices, isLoading: invoicesLoading } = useInvoices();
+  const { isAuthenticated, isLoading: authLoading } = useAuthCheck();
   
-  if (isLoading) {
+  // Find the invoice with the matching ID
+  const invoice = invoices.find(inv => inv.id === id);
+  
+  if (authLoading || invoicesLoading) {
     return <div className="py-8 text-center">Loading invoice details...</div>;
+  }
+  
+  if (!isAuthenticated) {
+    return null; // Auth check will redirect
   }
   
   if (!invoice) {
@@ -45,49 +64,29 @@ const EditInvoice = () => {
 };
 
 const NewInvoice = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { isAuthenticated, isLoading } = useAuthCheck();
   
-  // Check if user is authenticated
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to create invoices.",
-          variant: "destructive",
-        });
-        navigate('/login');
-      }
-    };
-    
-    checkAuth();
-  }, [navigate, toast]);
+  if (isLoading) {
+    return <div className="py-8 text-center">Loading...</div>;
+  }
+  
+  if (!isAuthenticated) {
+    return null; // Auth check will redirect
+  }
   
   return <InvoiceForm />;
 };
 
 const InvoicesPage = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { isAuthenticated, isLoading } = useAuthCheck();
   
-  // Check if user is authenticated
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to access invoices.",
-          variant: "destructive",
-        });
-        navigate('/login');
-      }
-    };
-    
-    checkAuth();
-  }, [navigate, toast]);
+  if (isLoading) {
+    return <div className="py-8 text-center">Loading...</div>;
+  }
+  
+  if (!isAuthenticated) {
+    return null; // Auth check will redirect
+  }
   
   return (
     <div className="container mx-auto py-6 space-y-6">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -47,19 +46,17 @@ export const useInvoices = () => {
     setError(null);
     
     try {
-      let userId = DEMO_USER_ID;
+      // Check if user is authenticated
+      const { data: sessionData } = await supabase.auth.getSession();
       
-      if (!DEMO_MODE) {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setInvoices([]);
-          setIsLoading(false);
-          return;
-        }
-        
-        userId = user.id;
+      if (!sessionData.session) {
+        // If not authenticated and not in demo mode, return empty array
+        setInvoices([]);
+        setIsLoading(false);
+        return;
       }
+      
+      const userId = sessionData.session.user.id;
       
       const { data: invoicesData, error: invoicesError } = await supabase
         .from("invoices")
@@ -118,23 +115,19 @@ export const useInvoices = () => {
     setError(null);
     
     try {
-      let userId = DEMO_USER_ID;
+      // Get the user ID
+      const { data: sessionData } = await supabase.auth.getSession();
       
-      if (!DEMO_MODE) {
-        // Get the user ID
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          toast({
-            title: "Authentication Required",
-            description: "Please login to create invoices",
-            variant: "destructive",
-          });
-          throw new Error("User not authenticated");
-        }
-        
-        userId = user.id;
+      if (!sessionData.session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please login to create invoices",
+          variant: "destructive",
+        });
+        throw new Error("User not authenticated");
       }
+      
+      const userId = sessionData.session.user.id;
       
       // Insert invoice
       const { data, error } = await supabase

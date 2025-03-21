@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -17,6 +16,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -52,9 +52,14 @@ const mainNavItems: NavItem[] = [
     icon: FileText,
   },
   {
+    title: "Calculator",
+    href: "/calculator",
+    icon: Calculator,
+  },
+  {
     title: "Tax Optimization",
     href: "/taxes",
-    icon: Calculator,
+    icon: DollarSign,
   },
 ];
 
@@ -81,12 +86,13 @@ const Sidebar = ({ isOpen }: SidebarProps) => {
   const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     toast({
       title: "Logging out",
       description: "You have been logged out successfully.",
     });
-    // Add actual logout logic here
+    window.location.href = "/login";
   };
 
   return (
