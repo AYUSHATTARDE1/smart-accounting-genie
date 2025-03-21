@@ -71,8 +71,8 @@ const Login = () => {
           password,
         });
       } else {
-        // Sign in
-        result = await supabase.auth.signIn({
+        // Sign in - using the correct method name
+        result = await supabase.auth.signInWithPassword({
           email,
           password,
         });
