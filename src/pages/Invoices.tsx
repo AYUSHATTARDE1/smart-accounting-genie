@@ -3,12 +3,24 @@ import React from "react";
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import InvoiceForm from "@/components/invoices/InvoiceForm";
+import { useInvoices } from "@/hooks/use-invoices";
 
 const EditInvoice = () => {
   const { id } = useParams();
-  // This is a placeholder - we would fetch the invoice by ID here
-  // In a real implementation, we would use the id to fetch the invoice data
-  return <InvoiceForm />;
+  const { invoices, isLoading } = useInvoices();
+  
+  // Find the invoice with the matching ID
+  const invoice = invoices.find(inv => inv.id === id);
+  
+  if (isLoading) {
+    return <div className="py-8 text-center">Loading invoice details...</div>;
+  }
+  
+  if (!invoice) {
+    return <div className="py-8 text-center">Invoice not found. <Navigate to="/invoices" replace /></div>;
+  }
+  
+  return <InvoiceForm initialData={invoice} />;
 };
 
 const InvoicesPage = () => {

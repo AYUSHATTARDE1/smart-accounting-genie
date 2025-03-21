@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,46 @@ const GetStarted = () => {
     taxId: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check if user already has a business profile
+  useEffect(() => {
+    checkExistingProfile();
+  }, []);
+
+  const checkExistingProfile = async () => {
+    setIsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Try to get existing profile
+        const { data, error } = await supabase
+          .from("business_profiles")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+        
+        if (data) {
+          // User already has a profile, redirect to dashboard
+          navigate('/dashboard');
+          return;
+        }
+        
+        // Pre-fill email if available
+        if (user.email) {
+          setFormData(prev => ({
+            ...prev,
+            email: user.email || "",
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Error checking user profile:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -87,8 +127,8 @@ const GetStarted = () => {
         description: "Your business profile has been saved successfully.",
       });
       
-      // Navigate to calculator
-      navigate('/calculator');
+      // Navigate to dashboard
+      navigate('/dashboard');
       
     } catch (error) {
       console.error("Error saving business profile:", error);
@@ -101,6 +141,17 @@ const GetStarted = () => {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="container max-w-4xl py-8 md:py-12 flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
+          <p className="mt-2 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-4xl py-8 md:py-12 animate-fadeIn">
