@@ -1,18 +1,51 @@
 
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { CustomButton } from "@/components/ui/custom-button";
 import { Input } from "@/components/ui/input";
 import { DollarSign, Mail, Lock, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check if we're on signup path
+  useEffect(() => {
+    if (location.pathname === "/signup") {
+      setIsSignUp(true);
+    }
+  }, [location.pathname]);
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        // Check if user has a business profile
+        const { data: profileData } = await supabase
+          .from("business_profiles")
+          .select("*")
+          .eq("user_id", data.session.user.id)
+          .single();
+          
+        if (profileData) {
+          navigate("/dashboard");
+        } else {
+          navigate("/get-started");
+        }
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,18 +60,59 @@ const Login = () => {
       return;
     }
 
-    // Simulate login process
     setIsLoading(true);
     
-    // Simulate API call delay
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      let result;
+      if (isSignUp) {
+        // Sign up
+        result = await supabase.auth.signUp({
+          email,
+          password,
+        });
+      } else {
+        // Sign in
+        result = await supabase.auth.signIn({
+          email,
+          password,
+        });
+      }
+      
+      if (result.error) {
+        throw result.error;
+      }
+      
       toast({
         title: "Success",
-        description: "You have been logged in successfully",
+        description: isSignUp 
+          ? "Account created successfully. Please check your email to verify your account."
+          : "You have been logged in successfully",
       });
-      navigate("/dashboard");
-    }, 1500);
+      
+      if (result.data.session) {
+        // Check if user has a business profile
+        const { data: profileData } = await supabase
+          .from("business_profiles")
+          .select("*")
+          .eq("user_id", result.data.session.user.id)
+          .single();
+          
+        if (profileData) {
+          navigate("/dashboard");
+        } else {
+          navigate("/get-started");
+        }
+      }
+    } catch (error) {
+      console.error("Authentication error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Authentication failed. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,8 +135,8 @@ const Login = () => {
         
         <div className="bg-card rounded-xl border border-border shadow-subtle p-8">
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold mb-2">Welcome back</h1>
-            <p className="text-muted-foreground">Sign in to your account</p>
+            <h1 className="text-2xl font-bold mb-2">{isSignUp ? "Create an account" : "Welcome back"}</h1>
+            <p className="text-muted-foreground">{isSignUp ? "Sign up to get started" : "Sign in to your account"}</p>
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -89,12 +163,14 @@ const Login = () => {
                 <label htmlFor="password" className="text-sm font-medium">
                   Password
                 </label>
-                <Link 
-                  to="/forgot-password" 
-                  className="text-xs text-primary hover:text-primary/90"
-                >
-                  Forgot password?
-                </Link>
+                {!isSignUp && (
+                  <Link 
+                    to="/forgot-password" 
+                    className="text-xs text-primary hover:text-primary/90"
+                  >
+                    Forgot password?
+                  </Link>
+                )}
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -127,15 +203,26 @@ const Login = () => {
               className="w-full"
               isLoading={isLoading}
             >
-              Sign In
+              {isSignUp ? "Sign Up" : "Sign In"}
             </CustomButton>
           </form>
           
           <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">Don't have an account? </span>
-            <Link to="/signup" className="text-primary hover:text-primary/90 font-medium">
-              Sign up
-            </Link>
+            {isSignUp ? (
+              <>
+                <span className="text-muted-foreground">Already have an account? </span>
+                <Link to="/login" className="text-primary hover:text-primary/90 font-medium">
+                  Sign in
+                </Link>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground">Don't have an account? </span>
+                <Link to="/signup" className="text-primary hover:text-primary/90 font-medium">
+                  Sign up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

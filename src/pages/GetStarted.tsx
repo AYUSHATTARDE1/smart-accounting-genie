@@ -33,44 +33,48 @@ const GetStarted = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user already has a business profile
+  // Check if user is authenticated and if they already have a business profile
   useEffect(() => {
-    checkExistingProfile();
-  }, []);
-
-  const checkExistingProfile = async () => {
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // Try to get existing profile
-        const { data, error } = await supabase
+    const checkUserAndProfile = async () => {
+      setIsLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          // User is not authenticated, redirect to login
+          navigate('/login');
+          return;
+        }
+        
+        // User is authenticated, check if they have a profile
+        const { data: profile, error } = await supabase
           .from("business_profiles")
           .select("*")
-          .eq("user_id", user.id)
+          .eq("user_id", session.user.id)
           .single();
         
-        if (data) {
+        if (profile) {
           // User already has a profile, redirect to dashboard
           navigate('/dashboard');
           return;
         }
         
         // Pre-fill email if available
-        if (user.email) {
+        if (session.user.email) {
           setFormData(prev => ({
             ...prev,
-            email: user.email || "",
+            email: session.user.email || "",
           }));
         }
+      } catch (error) {
+        console.error("Error checking user profile:", error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error checking user profile:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+
+    checkUserAndProfile();
+  }, [navigate]);
 
   const handleChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -93,9 +97,9 @@ const GetStarted = () => {
     
     try {
       // Check if user is authenticated
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (!user) {
+      if (!session) {
         toast({
           title: "Login required",
           description: "Please login to save your business profile.",
@@ -109,7 +113,7 @@ const GetStarted = () => {
       const { error } = await supabase
         .from("business_profiles")
         .insert({
-          user_id: user.id,
+          user_id: session.user.id,
           business_name: formData.businessName,
           business_type: formData.businessType,
           address: formData.address,
