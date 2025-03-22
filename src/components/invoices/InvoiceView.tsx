@@ -38,7 +38,9 @@ const InvoiceView: React.FC<InvoiceViewProps> = ({ invoice }) => {
   };
 
   const handleDownload = () => {
-    downloadInvoiceAsPdf(invoice);
+    if (invoice) {
+      downloadInvoiceAsPdf(invoice);
+    }
   };
 
   return (

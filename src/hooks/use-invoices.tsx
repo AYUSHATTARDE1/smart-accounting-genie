@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +55,7 @@ export const useInvoices = () => {
       if (!sessionData.session?.user) {
         console.log("No authenticated user found");
         setInvoices([]);
+        setIsLoading(false);
         return;
       }
       
@@ -76,6 +78,7 @@ export const useInvoices = () => {
       
       if (invoiceIds.length === 0) {
         setInvoices([]);
+        setIsLoading(false);
         return;
       }
       
@@ -330,26 +333,24 @@ export const useInvoices = () => {
         // Add company logo if available
         if (settings.company_logo_url) {
           try {
-            // Get the image dimensions for proper scaling
-            const img = new Image();
-            img.src = settings.company_logo_url;
-            
-            // Calculate aspect ratio and set max width/height
+            // Calculate max logo dimensions for proper scaling
             const maxLogoWidth = 60;
             const maxLogoHeight = 30;
             
             // Place the logo in the top-left corner
-            doc.addImage(settings.company_logo_url, 'JPEG', 20, yPos, maxLogoWidth, maxLogoHeight);
+            doc.addImage(settings.company_logo_url, 'JPEG', 20, yPos, maxLogoWidth, maxLogoHeight, undefined, 'FAST');
             yPos += maxLogoHeight + 10;
           } catch (logoError) {
             console.error("Error adding logo to PDF:", logoError);
+            // Continue without logo if there's an error
+            yPos += 10;
           }
         }
         
         // Add company name
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
-        doc.text(settings.company_name, 20, yPos);
+        doc.text(settings.company_name || "Your Company", 20, yPos);
         yPos += 8;
         
         // Add company details

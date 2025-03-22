@@ -20,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import AppLayout from "./components/layout/AppLayout";
 import ChatInterface from "./components/ai/ChatInterface";
 import Settings from "./pages/Settings";
+import PostInitialSetup from "./pages/PostInitialSetup";
 import { Session } from "@supabase/supabase-js";
 
 const queryClient = new QueryClient({
@@ -27,7 +28,7 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 60000, // 1 minute
+      staleTime: 300000, // 5 minutes
     },
   },
 });
@@ -35,6 +36,7 @@ const queryClient = new QueryClient({
 const App = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [hasCompletedSetup, setHasCompletedSetup] = useState<boolean | null>(null);
 
   // Improved auth state management to persist sessions
   useEffect(() => {
@@ -43,7 +45,14 @@ const App = () => {
       (event, currentSession) => {
         console.log("Auth state changed:", event);
         setSession(currentSession);
-        setIsAuthLoading(false);
+
+        if (currentSession) {
+          checkCompletedSetup(currentSession.user.id);
+        } else {
+          setHasCompletedSetup(null);
+        }
+        
+        // Don't set isAuthLoading to false here, wait for the checkSession call
       }
     );
     
@@ -54,11 +63,37 @@ const App = () => {
         if (error) {
           console.error("Error checking session:", error);
         }
+        
         setSession(data.session);
+        
+        if (data.session) {
+          await checkCompletedSetup(data.session.user.id);
+        }
       } catch (err) {
         console.error("Session check failed:", err);
       } finally {
         setIsAuthLoading(false);
+      }
+    };
+    
+    const checkCompletedSetup = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("business_profiles")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error checking business profile:", error);
+          setHasCompletedSetup(false);
+          return;
+        }
+
+        setHasCompletedSetup(!!data);
+      } catch (err) {
+        console.error("Profile check failed:", err);
+        setHasCompletedSetup(false);
       }
     };
     
@@ -82,6 +117,19 @@ const App = () => {
 
   const isAuthenticated = !!session;
 
+  // Direct users to appropriate setup pages
+  const getRedirectPath = () => {
+    if (!isAuthenticated) {
+      return "/login";
+    }
+    
+    if (hasCompletedSetup === false) {
+      return "/post-initial-setup";
+    }
+    
+    return "/dashboard";
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -91,20 +139,25 @@ const App = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={
-              isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+              isAuthenticated ? <Navigate to={getRedirectPath()} /> : <Login />
             } />
             <Route path="/signup" element={
-              isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+              isAuthenticated ? <Navigate to={getRedirectPath()} /> : <Login />
             } />
             <Route path="/get-started" element={
               isAuthenticated ? <GetStarted /> : <Navigate to="/login" />
+            } />
+            <Route path="/post-initial-setup" element={
+              isAuthenticated ? <PostInitialSetup /> : <Navigate to="/login" />
             } />
             <Route path="/calculator" element={<Calculator />} />
             <Route path="/document-upload" element={<DocumentUpload />} />
             
             {/* Protected routes - wrapped in AppLayout */}
             <Route element={
-              isAuthenticated ? <AppLayout /> : <Navigate to="/login" />
+              isAuthenticated ? 
+                (hasCompletedSetup === false ? <Navigate to="/post-initial-setup" /> : <AppLayout />) 
+                : <Navigate to="/login" />
             }>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/expenses" element={<Expenses />} />

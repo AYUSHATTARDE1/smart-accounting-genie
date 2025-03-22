@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Invoice, useInvoices } from "@/hooks/use-invoices";
@@ -194,7 +195,10 @@ const InvoiceList = () => {
                             {selectedInvoice && viewMode === "edit" && (
                               <InvoiceForm 
                                 initialData={selectedInvoice} 
-                                onSuccess={() => setViewMode(null)}
+                                onSuccess={() => {
+                                  setViewMode(null);
+                                  fetchInvoices();
+                                }}
                               />
                             )}
                           </SheetContent>
