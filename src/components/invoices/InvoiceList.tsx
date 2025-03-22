@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Invoice, useInvoices } from "@/hooks/use-invoices";
 import { formatDistanceToNow } from "date-fns";
@@ -31,10 +30,14 @@ import InvoiceForm from "./InvoiceForm";
 import InvoiceView from "./InvoiceView";
 
 const InvoiceList = () => {
-  const { invoices, isLoading, deleteInvoice, downloadInvoiceAsPdf } = useInvoices();
+  const { invoices, isLoading, deleteInvoice, downloadInvoiceAsPdf, fetchInvoices } = useInvoices();
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [viewMode, setViewMode] = useState<"view" | "edit" | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
 
   const handleEdit = (invoice: Invoice) => {
     setSelectedInvoice(invoice);

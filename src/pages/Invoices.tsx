@@ -78,8 +78,14 @@ const LoadingState = () => (
 
 const EditInvoice = () => {
   const { id } = useParams();
-  const { invoices, isLoading: invoicesLoading } = useInvoices();
+  const { invoices, isLoading: invoicesLoading, fetchInvoices } = useInvoices();
   const { isAuthenticated, isLoading: authLoading } = useAuthCheck();
+  
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchInvoices();
+    }
+  }, [isAuthenticated, fetchInvoices]);
   
   if (authLoading || invoicesLoading) {
     return <LoadingState />;
@@ -115,6 +121,13 @@ const NewInvoice = () => {
 
 const InvoicesPage = () => {
   const { isAuthenticated, isLoading } = useAuthCheck();
+  const { fetchInvoices } = useInvoices();
+  
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchInvoices();
+    }
+  }, [isAuthenticated, fetchInvoices]);
   
   if (isLoading) {
     return <LoadingState />;
