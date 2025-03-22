@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -89,14 +88,18 @@ export const useInvoices = () => {
             amount: Number(item.amount)
           }));
         
+        // Ensure status is a valid InvoiceStatus type
+        const status = validateInvoiceStatus(invoice.status);
+        
         return {
           ...invoice,
+          status,
           total_amount: Number(invoice.total_amount),
           items
         };
       });
       
-      setInvoices(populatedInvoices);
+      setInvoices(populatedInvoices as Invoice[]);
     } catch (error) {
       console.error("Error fetching invoices:", error);
       toast({
@@ -107,6 +110,14 @@ export const useInvoices = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Helper function to validate and convert status string to InvoiceStatus type
+  const validateInvoiceStatus = (status: string): InvoiceStatus => {
+    const validStatuses: InvoiceStatus[] = ["draft", "sent", "paid", "overdue"];
+    return validStatuses.includes(status as InvoiceStatus) 
+      ? (status as InvoiceStatus) 
+      : "draft"; // Default to draft if invalid
   };
 
   const createInvoice = async (invoice: Invoice): Promise<string | null> => {
