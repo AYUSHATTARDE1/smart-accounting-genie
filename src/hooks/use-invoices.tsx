@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -466,7 +467,12 @@ export const useInvoices = () => {
   };
 
   useEffect(() => {
-    fetchInvoices();
+    // Wrap in setTimeout to ensure it runs after component mounts
+    const timer = setTimeout(() => {
+      fetchInvoices();
+    }, 0);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   return {

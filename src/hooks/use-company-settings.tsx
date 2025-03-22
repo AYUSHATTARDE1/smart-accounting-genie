@@ -85,6 +85,23 @@ export const useCompanySettings = () => {
       const fileName = `${user.id}/${uuidv4()}.${fileExt}`;
       const filePath = `company-logos/${fileName}`;
       
+      // Check if the bucket exists before uploading
+      const { data: buckets } = await supabase
+        .storage
+        .listBuckets();
+      
+      const bucketExists = buckets?.some(bucket => bucket.name === 'company-assets');
+      
+      if (!bucketExists) {
+        console.error("Bucket 'company-assets' does not exist");
+        toast({
+          title: "Upload failed",
+          description: "Storage bucket not configured properly",
+          variant: "destructive",
+        });
+        return null;
+      }
+      
       const { error: uploadError } = await supabase.storage
         .from('company-assets')
         .upload(filePath, file, {
