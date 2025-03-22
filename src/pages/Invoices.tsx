@@ -1,13 +1,13 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useParams, useNavigate } from "react-router-dom";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import InvoiceForm from "@/components/invoices/InvoiceForm";
 import { useInvoices } from "@/hooks/use-invoices";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
 import { useCompanySettings } from "@/hooks/use-company-settings";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Create a shared authentication hook to avoid duplicate code
 const useAuthCheck = () => {
@@ -18,47 +18,79 @@ const useAuthCheck = () => {
   const { fetchSettings } = useCompanySettings();
 
   useEffect(() => {
+    let isMounted = true;
+    
     const checkAuth = async () => {
-      setIsLoading(true);
-      const { data } = await supabase.auth.getSession();
-      
-      if (!data.session) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to access this feature.",
-          variant: "destructive",
-        });
-        navigate('/login');
-        setIsAuthenticated(false);
-      } else {
-        setIsAuthenticated(true);
-        // Fetch company settings when user is authenticated
-        await fetchSettings();
+      try {
+        setIsLoading(true);
+        const { data } = await supabase.auth.getSession();
+        
+        if (isMounted) {
+          if (!data.session) {
+            toast({
+              title: "Authentication required",
+              description: "Please log in to access this feature.",
+              variant: "destructive",
+            });
+            navigate('/login');
+            setIsAuthenticated(false);
+          } else {
+            setIsAuthenticated(true);
+            // Fetch company settings when user is authenticated
+            await fetchSettings();
+          }
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        if (isMounted) {
+          setIsLoading(false);
+          setIsAuthenticated(false);
+          navigate('/login');
+        }
       }
-      setIsLoading(false);
     };
     
     checkAuth();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [navigate, toast, fetchSettings]);
 
   return { isAuthenticated, isLoading };
 };
+
+const LoadingState = () => (
+  <div className="container mx-auto py-6 space-y-6">
+    <Skeleton className="h-8 w-64 mb-4" />
+    <Skeleton className="h-4 w-96 mb-6" />
+    <div className="border rounded-md p-6">
+      <Skeleton className="h-8 w-full mb-4" />
+      <div className="space-y-3">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    </div>
+  </div>
+);
 
 const EditInvoice = () => {
   const { id } = useParams();
   const { invoices, isLoading: invoicesLoading } = useInvoices();
   const { isAuthenticated, isLoading: authLoading } = useAuthCheck();
   
-  // Find the invoice with the matching ID
-  const invoice = invoices.find(inv => inv.id === id);
-  
   if (authLoading || invoicesLoading) {
-    return <div className="py-8 text-center">Loading invoice details...</div>;
+    return <LoadingState />;
   }
   
   if (!isAuthenticated) {
     return null; // Auth check will redirect
   }
+  
+  // Find the invoice with the matching ID
+  const invoice = invoices.find(inv => inv.id === id);
   
   if (!invoice) {
     return <div className="py-8 text-center">Invoice not found. <Navigate to="/invoices" replace /></div>;
@@ -71,7 +103,7 @@ const NewInvoice = () => {
   const { isAuthenticated, isLoading } = useAuthCheck();
   
   if (isLoading) {
-    return <div className="py-8 text-center">Loading...</div>;
+    return <LoadingState />;
   }
   
   if (!isAuthenticated) {
@@ -85,7 +117,7 @@ const InvoicesPage = () => {
   const { isAuthenticated, isLoading } = useAuthCheck();
   
   if (isLoading) {
-    return <div className="py-8 text-center">Loading...</div>;
+    return <LoadingState />;
   }
   
   if (!isAuthenticated) {
