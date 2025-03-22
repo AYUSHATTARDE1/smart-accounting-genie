@@ -13,6 +13,7 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -27,20 +28,40 @@ const Login = () => {
   // Check if user is already authenticated
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        // Check if user has a business profile
-        const { data: profileData } = await supabase
-          .from("business_profiles")
-          .select("*")
-          .eq("user_id", data.session.user.id)
-          .single();
-          
-        if (profileData) {
-          navigate("/dashboard");
-        } else {
-          navigate("/get-started");
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Session check error:", error);
+          setAuthChecked(true);
+          return;
         }
+        
+        if (data.session) {
+          console.log("User already authenticated, redirecting");
+          // Check if user has a business profile
+          const { data: profileData, error: profileError } = await supabase
+            .from("business_profiles")
+            .select("*")
+            .eq("user_id", data.session.user.id)
+            .maybeSingle();
+          
+          if (profileError) {
+            console.error("Error checking profile:", profileError);
+          }
+          
+          if (profileData) {
+            navigate("/dashboard");
+          } else {
+            navigate("/get-started");
+          }
+        } else {
+          console.log("No active session found");
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+      } finally {
+        setAuthChecked(true);
       }
     };
     
@@ -71,7 +92,7 @@ const Login = () => {
           password,
         });
       } else {
-        // Sign in - using the correct method name
+        // Sign in
         result = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -91,11 +112,15 @@ const Login = () => {
       
       if (result.data.session) {
         // Check if user has a business profile
-        const { data: profileData } = await supabase
+        const { data: profileData, error } = await supabase
           .from("business_profiles")
           .select("*")
           .eq("user_id", result.data.session.user.id)
-          .single();
+          .maybeSingle();
+          
+        if (error) {
+          console.error("Profile check error:", error);
+        }
           
         if (profileData) {
           navigate("/dashboard");
@@ -114,6 +139,15 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent"></div>
+        <p className="ml-2">Checking authentication...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-secondary/30 animate-fadeIn">

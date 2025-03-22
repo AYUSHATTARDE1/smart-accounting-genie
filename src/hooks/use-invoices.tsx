@@ -1,8 +1,6 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { v4 as uuidv4 } from 'uuid';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { useCompanySettings } from "@/hooks/use-company-settings";
@@ -37,35 +35,47 @@ export interface Invoice {
 export const useInvoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
   const { settings } = useCompanySettings();
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
-      if (!user) {
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        throw new Error("Authentication error. Please sign in again.");
+      }
+      
+      if (!sessionData.session?.user) {
         console.log("No authenticated user found");
-        setIsLoading(false);
+        setInvoices([]);
         return;
       }
+      
+      const userId = sessionData.session.user.id;
       
       // Fetch invoices
       const { data: invoicesData, error: invoicesError } = await supabase
         .from("invoices")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .order('created_at', { ascending: false });
       
-      if (invoicesError) throw invoicesError;
+      if (invoicesError) {
+        console.error("Error fetching invoices:", invoicesError);
+        throw invoicesError;
+      }
       
       // Fetch invoice items for all invoices
-      const invoiceIds = invoicesData.map(inv => inv.id);
+      const invoiceIds = invoicesData?.map(inv => inv.id) || [];
       
       if (invoiceIds.length === 0) {
         setInvoices([]);
-        setIsLoading(false);
         return;
       }
       
@@ -74,11 +84,14 @@ export const useInvoices = () => {
         .select("*")
         .in("invoice_id", invoiceIds);
       
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error("Error fetching invoice items:", itemsError);
+        throw itemsError;
+      }
       
       // Combine invoices with their items
       const populatedInvoices = invoicesData.map(invoice => {
-        const items = itemsData
+        const items = (itemsData || [])
           .filter(item => item.invoice_id === invoice.id)
           .map(item => ({
             id: item.id,
@@ -101,17 +114,18 @@ export const useInvoices = () => {
       });
       
       setInvoices(populatedInvoices as Invoice[]);
-    } catch (error) {
-      console.error("Error fetching invoices:", error);
+    } catch (err) {
+      console.error("Error in fetchInvoices:", err);
+      setError(err instanceof Error ? err : new Error("Failed to load invoices"));
       toast({
         title: "Error",
-        description: "Failed to load invoices",
+        description: "Failed to load invoices. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   // Helper function to validate and convert status string to InvoiceStatus type
   const validateInvoiceStatus = (status: string): InvoiceStatus => {
@@ -467,17 +481,32 @@ export const useInvoices = () => {
   };
 
   useEffect(() => {
-    // Wrap in setTimeout to ensure it runs after component mounts
-    const timer = setTimeout(() => {
-      fetchInvoices();
-    }, 0);
+    fetchInvoices();
     
-    return () => clearTimeout(timer);
-  }, []);
+    // Set up subscription for real-time updates
+    const invoicesSubscription = supabase
+      .channel('invoice-changes')
+      .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'invoices' 
+        }, 
+        () => {
+          fetchInvoices();
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(invoicesSubscription);
+    };
+  }, [fetchInvoices]);
 
   return {
     invoices,
     isLoading,
+    error,
+    fetchInvoices,
     createInvoice,
     updateInvoice,
     deleteInvoice,

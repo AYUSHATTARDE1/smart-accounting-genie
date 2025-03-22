@@ -1,291 +1,310 @@
 
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Building2, Calculator, FileText, Upload, ChevronRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-interface FormData {
-  businessName: string;
-  businessType: string;
-  address: string;
-  email: string;
-  phone: string;
-  taxId: string;
-}
+const businessTypes = [
+  { value: "sole-proprietorship", label: "Sole Proprietorship" },
+  { value: "partnership", label: "Partnership" },
+  { value: "llc", label: "Limited Liability Company (LLC)" },
+  { value: "corporation", label: "Corporation" },
+  { value: "s-corporation", label: "S Corporation" },
+  { value: "non-profit", label: "Non-Profit Organization" },
+];
 
 const GetStarted = () => {
-  const navigate = useNavigate();
+  const [businessName, setBusinessName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [businessType, setBusinessType] = useState("sole-proprietorship");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const { toast } = useToast();
-  const [formData, setFormData] = useState<FormData>({
-    businessName: "",
-    businessType: "sole-proprietorship",
-    address: "",
-    email: "",
-    phone: "",
-    taxId: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
-  // Check if user is authenticated and if they already have a business profile
+  // Get current user information
   useEffect(() => {
-    const checkUserAndProfile = async () => {
-      setIsLoading(true);
+    const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
         
-        if (!session) {
-          // User is not authenticated, redirect to login
-          navigate('/login');
+        if (error) {
+          console.error("Session check error:", error);
+          toast({
+            title: "Authentication required",
+            description: "Please sign in to set up your business",
+            variant: "destructive",
+          });
+          navigate("/login");
           return;
         }
         
-        // User is authenticated, check if they have a profile
-        const { data: profile, error } = await supabase
+        if (!data.session) {
+          toast({
+            title: "Authentication required",
+            description: "Please sign in to set up your business",
+            variant: "destructive",
+          });
+          navigate("/login");
+          return;
+        }
+        
+        // Check if user already has a business profile
+        const { data: profileData, error: profileError } = await supabase
           .from("business_profiles")
           .select("*")
-          .eq("user_id", session.user.id)
-          .single();
-        
-        if (profile) {
-          // User already has a profile, redirect to dashboard
-          navigate('/dashboard');
-          return;
+          .eq("user_id", data.session.user.id)
+          .maybeSingle();
+          
+        if (profileError) {
+          console.error("Error checking profile:", profileError);
         }
         
-        // Pre-fill email if available
-        if (session.user.email) {
-          setFormData(prev => ({
-            ...prev,
-            email: session.user.email || "",
-          }));
+        if (profileData) {
+          // User already has a profile, set form fields with existing data
+          setBusinessName(profileData.business_name || "");
+          setEmail(profileData.email || "");
+          setPhone(profileData.phone || "");
+          setAddress(profileData.address || "");
+          setTaxId(profileData.tax_id || "");
+          setBusinessType(profileData.business_type || "sole-proprietorship");
         }
-      } catch (error) {
-        console.error("Error checking user profile:", error);
+      } catch (err) {
+        console.error("Auth check failed:", err);
       } finally {
-        setIsLoading(false);
+        setIsAuthChecking(false);
       }
     };
-
-    checkUserAndProfile();
-  }, [navigate]);
-
-  const handleChange = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+    
+    checkAuth();
+  }, [navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Basic validation
-    if (!formData.businessName || !formData.businessType || !formData.email) {
+    if (!businessName || !email || !businessType) {
       toast({
         title: "Missing information",
-        description: "Please fill out all required fields.",
+        description: "Please fill in all required fields.",
         variant: "destructive",
       });
+      setIsLoading(false);
       return;
     }
     
-    setIsSubmitting(true);
-    
     try {
-      // Check if user is authenticated
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!session) {
+      if (!user) {
         toast({
-          title: "Login required",
-          description: "Please login to save your business profile.",
+          title: "Authentication required",
+          description: "Please sign in to continue.",
           variant: "destructive",
         });
-        navigate('/login');
+        navigate("/login");
         return;
       }
       
-      // Save business profile
-      const { error } = await supabase
-        .from("business_profiles")
-        .insert({
-          user_id: session.user.id,
-          business_name: formData.businessName,
-          business_type: formData.businessType,
-          address: formData.address,
-          email: formData.email,
-          phone: formData.phone,
-          tax_id: formData.taxId,
-        });
+      const profileData = {
+        user_id: user.id,
+        business_name: businessName,
+        email: email,
+        phone: phone,
+        address: address,
+        tax_id: taxId,
+        business_type: businessType,
+      };
       
-      if (error) {
-        throw error;
+      // Check if profile already exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from("business_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (checkError) {
+        console.error("Error checking profile:", checkError);
+      }
+      
+      let result;
+      
+      if (existingProfile?.id) {
+        // Update existing profile
+        result = await supabase
+          .from("business_profiles")
+          .update(profileData)
+          .eq("id", existingProfile.id);
+      } else {
+        // Insert new profile
+        result = await supabase
+          .from("business_profiles")
+          .insert(profileData);
+      }
+      
+      if (result.error) {
+        throw result.error;
       }
       
       toast({
-        title: "Profile saved",
-        description: "Your business profile has been saved successfully.",
+        title: "Success",
+        description: "Your business information has been saved.",
       });
       
-      // Navigate to dashboard
-      navigate('/dashboard');
-      
+      navigate("/dashboard");
     } catch (error) {
-      console.error("Error saving business profile:", error);
+      console.error("Error saving business data:", error);
       toast({
         title: "Error",
-        description: "Failed to save your business profile. Please try again.",
+        description: "Failed to save business information. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
-
-  if (isLoading) {
+  
+  if (isAuthChecking) {
     return (
-      <div className="container max-w-4xl py-8 md:py-12 flex items-center justify-center min-h-[50vh]">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
-          <p className="mt-2 text-muted-foreground">Loading...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="ml-2">Checking your account...</p>
       </div>
     );
   }
 
   return (
-    <div className="container max-w-4xl py-8 md:py-12 animate-fadeIn">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold">Welcome to My Bill Book</h1>
-        <p className="text-muted-foreground mt-2">Let's set up your business profile</p>
-      </div>
-      
-      <Card className="border-none shadow-lg">
-        <CardHeader>
-          <CardTitle>Business Profile</CardTitle>
+    <div className="container max-w-3xl mx-auto py-12 px-4">
+      <Card className="shadow-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Set Up Your Business</CardTitle>
           <CardDescription>
-            Enter your business information to get started
+            Provide your business information to get started
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="businessName">Business Name <span className="text-red-500">*</span></Label>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="businessName" className="text-base">
+                  Business Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="businessName"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
                   placeholder="Your Business Name"
-                  value={formData.businessName}
-                  onChange={(e) => handleChange("businessName", e.target.value)}
+                  className="mt-1"
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="businessType">Business Type <span className="text-red-500">*</span></Label>
+              
+              <div>
+                <Label htmlFor="businessType" className="text-base">
+                  Business Type <span className="text-red-500">*</span>
+                </Label>
                 <Select 
-                  value={formData.businessType} 
-                  onValueChange={(value) => handleChange("businessType", value)}
+                  value={businessType} 
+                  onValueChange={setBusinessType}
                 >
-                  <SelectTrigger id="businessType">
-                    <SelectValue placeholder="Select Business Type" />
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select business type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="sole-proprietorship">Sole Proprietorship</SelectItem>
-                    <SelectItem value="partnership">Partnership</SelectItem>
-                    <SelectItem value="llc">Limited Liability Company (LLC)</SelectItem>
-                    <SelectItem value="corporation">Corporation</SelectItem>
+                    {businessTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="address">Business Address</Label>
-              <Input
-                id="address"
-                placeholder="123 Business St, City, State, ZIP"
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address <span className="text-red-500">*</span></Label>
+              
+              <div>
+                <Label htmlFor="email" className="text-base">
+                  Business Email <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="email"
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@business.com"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
+                  className="mt-1"
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+              
+              <div>
+                <Label htmlFor="phone" className="text-base">
+                  Business Phone
+                </Label>
                 <Input
                   id="phone"
-                  placeholder="(123) 456-7890"
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="mt-1"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="address" className="text-base">
+                  Business Address
+                </Label>
+                <Textarea
+                  id="address"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Street, City, State, Zip"
+                  className="mt-1"
+                  rows={3}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="taxId" className="text-base">
+                  Tax ID / EIN
+                </Label>
+                <Input
+                  id="taxId"
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  placeholder="XX-XXXXXXX"
+                  className="mt-1"
                 />
               </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="taxId">Tax ID / EIN (Optional)</Label>
-              <Input
-                id="taxId"
-                placeholder="XX-XXXXXXX"
-                value={formData.taxId}
-                onChange={(e) => handleChange("taxId", e.target.value)}
-              />
-            </div>
-            
-            <Button
-              type="submit"
-              className="w-full mt-4"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Saving..." : "Save & Continue"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <div className="text-center w-full">
-            <span className="text-sm text-muted-foreground">or explore these options</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+          </CardContent>
+          <CardFooter>
             <Button 
-              variant="outline" 
-              className="flex items-center gap-2 justify-center" 
-              onClick={() => navigate('/calculator')}
+              type="submit" 
+              size="lg" 
+              className="w-full"
+              disabled={isLoading}
             >
-              <Calculator className="h-4 w-4" />
-              Calculate Finances
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save and Continue'
+              )}
             </Button>
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2 justify-center" 
-              onClick={() => navigate('/document-upload')}
-            >
-              <Upload className="h-4 w-4" />
-              Upload Documents
-            </Button>
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2 justify-center" 
-              onClick={() => navigate('/invoices')}
-            >
-              <FileText className="h-4 w-4" />
-              Create Invoice
-            </Button>
-          </div>
-        </CardFooter>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   );

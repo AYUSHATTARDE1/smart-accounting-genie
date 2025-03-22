@@ -20,42 +20,57 @@ import NotFound from "./pages/NotFound";
 import AppLayout from "./components/layout/AppLayout";
 import ChatInterface from "./components/ai/ChatInterface";
 import Settings from "./pages/Settings";
+import { Session } from "@supabase/supabase-js";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Check for dark mode preference and auth state
+  // Improved auth state management to persist sessions
   useEffect(() => {
-    // Dark mode check
-    const isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-    }
-    
-    // Auth state check
+    // First set up the auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setIsAuthenticated(!!session);
+      (event, currentSession) => {
+        console.log("Auth state changed:", event);
+        setSession(currentSession);
+        setIsAuthLoading(false);
       }
     );
     
-    // Initial auth check
-    const checkAuth = async () => {
-      const { data } = await supabase.auth.getSession();
-      setIsAuthenticated(!!data.session);
+    // Then check for existing session
+    const checkSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("Error checking session:", error);
+        }
+        setSession(data.session);
+      } catch (err) {
+        console.error("Session check failed:", err);
+      } finally {
+        setIsAuthLoading(false);
+      }
     };
     
-    checkAuth();
+    checkSession();
     
+    // Cleanup subscription on unmount
     return () => {
       subscription?.unsubscribe();
     };
   }, []);
 
   // Show loading state while checking auth
-  if (isAuthenticated === null) {
+  if (isAuthLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
@@ -63,6 +78,8 @@ const App = () => {
       </div>
     );
   }
+
+  const isAuthenticated = !!session;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -72,46 +89,30 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Login />} />
-            <Route path="/get-started" element={<GetStarted />} />
+            <Route path="/login" element={
+              isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+            } />
+            <Route path="/signup" element={
+              isAuthenticated ? <Navigate to="/dashboard" /> : <Login />
+            } />
+            <Route path="/get-started" element={
+              isAuthenticated ? <GetStarted /> : <Navigate to="/login" />
+            } />
             <Route path="/calculator" element={<Calculator />} />
             <Route path="/document-upload" element={<DocumentUpload />} />
             
             {/* Protected routes - wrapped in AppLayout */}
-            <Route element={<AppLayout />}>
-              <Route 
-                path="/dashboard" 
-                element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} 
-              />
-              <Route 
-                path="/expenses" 
-                element={isAuthenticated ? <Expenses /> : <Navigate to="/login" />} 
-              />
-              <Route 
-                path="/reports" 
-                element={isAuthenticated ? <Reports /> : <Navigate to="/login" />} 
-              />
-              <Route 
-                path="/taxes/*" 
-                element={isAuthenticated ? <Taxes /> : <Navigate to="/login" />} 
-              />
-              <Route 
-                path="/invoices/*" 
-                element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />} 
-              />
-              <Route 
-                path="/ai-assistant" 
-                element={isAuthenticated ? <ChatInterface /> : <Navigate to="/login" />} 
-              />
-              <Route 
-                path="/settings" 
-                element={isAuthenticated ? <Settings /> : <Navigate to="/login" />} 
-              />
-              <Route 
-                path="/support" 
-                element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} 
-              />
+            <Route element={
+              isAuthenticated ? <AppLayout /> : <Navigate to="/login" />
+            }>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/expenses" element={<Expenses />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/taxes/*" element={<Taxes />} />
+              <Route path="/invoices/*" element={<Invoices />} />
+              <Route path="/ai-assistant" element={<ChatInterface />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/support" element={<Dashboard />} />
             </Route>
             
             {/* Catch-all route */}
