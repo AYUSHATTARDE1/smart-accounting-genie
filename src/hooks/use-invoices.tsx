@@ -35,7 +35,7 @@ export interface Invoice {
 
 export const useInvoices = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const { toast } = useToast();
   const { settings } = useCompanySettings();
@@ -45,6 +45,7 @@ export const useInvoices = () => {
     setError(null);
     
     try {
+      console.log("Fetching invoices...");
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -60,6 +61,7 @@ export const useInvoices = () => {
       }
       
       const userId = sessionData.session.user.id;
+      console.log("Fetching invoices for user:", userId);
       
       // Fetch invoices
       const { data: invoicesData, error: invoicesError } = await supabase
@@ -73,10 +75,13 @@ export const useInvoices = () => {
         throw invoicesError;
       }
       
+      console.log(`Retrieved ${invoicesData?.length || 0} invoices`);
+      
       // Fetch invoice items for all invoices
       const invoiceIds = invoicesData?.map(inv => inv.id) || [];
       
       if (invoiceIds.length === 0) {
+        console.log("No invoices found, setting empty array");
         setInvoices([]);
         setIsLoading(false);
         return;
@@ -91,6 +96,8 @@ export const useInvoices = () => {
         console.error("Error fetching invoice items:", itemsError);
         throw itemsError;
       }
+      
+      console.log(`Retrieved ${itemsData?.length || 0} invoice items`);
       
       // Combine invoices with their items
       const populatedInvoices = invoicesData.map(invoice => {
@@ -116,6 +123,7 @@ export const useInvoices = () => {
         };
       });
       
+      console.log("Setting invoices with items");
       setInvoices(populatedInvoices as Invoice[]);
     } catch (err) {
       console.error("Error in fetchInvoices:", err);
@@ -323,6 +331,7 @@ export const useInvoices = () => {
 
   const downloadInvoiceAsPdf = async (invoice: Invoice) => {
     try {
+      console.log("Generating PDF for invoice:", invoice.invoice_number);
       // Create a new PDF document
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -337,6 +346,7 @@ export const useInvoices = () => {
             const maxLogoWidth = 60;
             const maxLogoHeight = 30;
             
+            console.log("Adding logo:", settings.company_logo_url);
             // Place the logo in the top-left corner
             doc.addImage(settings.company_logo_url, 'JPEG', 20, yPos, maxLogoWidth, maxLogoHeight, undefined, 'FAST');
             yPos += maxLogoHeight + 10;
@@ -462,6 +472,7 @@ export const useInvoices = () => {
       }
       
       // Save the PDF
+      console.log("Saving PDF...");
       doc.save(`Invoice_${invoice.invoice_number}.pdf`);
       
       toast({
@@ -482,6 +493,7 @@ export const useInvoices = () => {
   };
 
   useEffect(() => {
+    console.log("useInvoices hook initialized");
     fetchInvoices();
     
     // Set up subscription for real-time updates
@@ -493,12 +505,14 @@ export const useInvoices = () => {
           table: 'invoices' 
         }, 
         () => {
+          console.log("Real-time update received for invoices table");
           fetchInvoices();
         }
       )
       .subscribe();
       
     return () => {
+      console.log("Cleaning up useInvoices hook");
       supabase.removeChannel(invoicesSubscription);
     };
   }, [fetchInvoices]);

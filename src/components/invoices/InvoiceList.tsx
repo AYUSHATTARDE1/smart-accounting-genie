@@ -26,6 +26,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import InvoiceForm from "./InvoiceForm";
 import InvoiceView from "./InvoiceView";
 
@@ -35,11 +37,17 @@ const InvoiceList = () => {
   const [viewMode, setViewMode] = useState<"view" | "edit" | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
+    console.log("InvoiceList component mounted, fetching invoices...");
     // Force a refresh of invoices when component mounts
     fetchInvoices();
   }, [fetchInvoices]);
+
+  useEffect(() => {
+    console.log("Current invoices state:", { count: invoices?.length, isLoading });
+  }, [invoices, isLoading]);
 
   const handleEdit = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
@@ -53,7 +61,20 @@ const InvoiceList = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this invoice?")) {
-      await deleteInvoice(id);
+      try {
+        await deleteInvoice(id);
+        toast({
+          title: "Success",
+          description: "Invoice deleted successfully",
+        });
+      } catch (error) {
+        console.error("Error deleting invoice:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete invoice",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -62,6 +83,13 @@ const InvoiceList = () => {
       setDownloadingId(invoice.id);
       try {
         await downloadInvoiceAsPdf(invoice);
+      } catch (error) {
+        console.error("Error downloading invoice:", error);
+        toast({
+          title: "Error",
+          description: "Failed to download invoice PDF",
+          variant: "destructive",
+        });
       } finally {
         setDownloadingId(null);
       }
@@ -81,6 +109,32 @@ const InvoiceList = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-2xl">Invoices</CardTitle>
+            <CardDescription>
+              Manage and track all your client invoices.
+            </CardDescription>
+          </div>
+          <Skeleton className="h-10 w-[120px]" />
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <div className="p-4">
+              <Skeleton className="h-10 w-full mb-4" />
+              <Skeleton className="h-16 w-full mb-2" />
+              <Skeleton className="h-16 w-full mb-2" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -99,14 +153,7 @@ const InvoiceList = () => {
         </Button>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-pulse text-center">
-              <FileText size={40} className="mx-auto mb-2 text-muted-foreground" />
-              <p className="text-muted-foreground">Loading invoices...</p>
-            </div>
-          </div>
-        ) : invoices.length === 0 ? (
+        {invoices.length === 0 ? (
           <div className="text-center py-8">
             <FileText size={40} className="mx-auto mb-2 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-1">No invoices yet</h3>
@@ -185,32 +232,14 @@ const InvoiceList = () => {
                             )}
                           </SheetContent>
                         </Sheet>
-                        <Sheet>
-                          <SheetTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(invoice)}
-                            >
-                              <Edit size={16} />
-                              <span className="sr-only">Edit</span>
-                            </Button>
-                          </SheetTrigger>
-                          <SheetContent side="right" className="sm:max-w-xl">
-                            <SheetHeader>
-                              <SheetTitle>Edit Invoice</SheetTitle>
-                            </SheetHeader>
-                            {selectedInvoice && viewMode === "edit" && (
-                              <InvoiceForm 
-                                initialData={selectedInvoice} 
-                                onSuccess={() => {
-                                  setViewMode(null);
-                                  fetchInvoices();
-                                }}
-                              />
-                            )}
-                          </SheetContent>
-                        </Sheet>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(invoice)}
+                        >
+                          <Edit size={16} />
+                          <span className="sr-only">Edit</span>
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

@@ -23,10 +23,26 @@ const useAuthCheck = () => {
     const checkAuth = async () => {
       try {
         setIsLoading(true);
-        const { data } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error checking auth session:", error);
+          if (isMounted) {
+            toast({
+              title: "Authentication error",
+              description: error.message,
+              variant: "destructive",
+            });
+            navigate('/login');
+            setIsAuthenticated(false);
+            setIsLoading(false);
+          }
+          return;
+        }
         
         if (isMounted) {
           if (!data.session) {
+            console.log("No active session found");
             toast({
               title: "Authentication required",
               description: "Please log in to access this feature.",
@@ -35,6 +51,7 @@ const useAuthCheck = () => {
             navigate('/login');
             setIsAuthenticated(false);
           } else {
+            console.log("User is authenticated");
             setIsAuthenticated(true);
             // Fetch company settings when user is authenticated
             await fetchSettings();
@@ -83,6 +100,7 @@ const EditInvoice = () => {
   
   useEffect(() => {
     if (isAuthenticated) {
+      console.log("EditInvoice: User authenticated, fetching invoices...");
       fetchInvoices();
     }
   }, [isAuthenticated, fetchInvoices]);
@@ -99,6 +117,7 @@ const EditInvoice = () => {
   const invoice = invoices.find(inv => inv.id === id);
   
   if (!invoice) {
+    console.log("Invoice not found, redirecting to invoices list");
     return <div className="py-8 text-center">Invoice not found. <Navigate to="/invoices" replace /></div>;
   }
   
@@ -107,6 +126,10 @@ const EditInvoice = () => {
 
 const NewInvoice = () => {
   const { isAuthenticated, isLoading } = useAuthCheck();
+  
+  useEffect(() => {
+    console.log("NewInvoice component: Auth state", { isAuthenticated, isLoading });
+  }, [isAuthenticated, isLoading]);
   
   if (isLoading) {
     return <LoadingState />;
@@ -124,16 +147,19 @@ const InvoicesPage = () => {
   const { fetchInvoices } = useInvoices();
   
   useEffect(() => {
+    console.log("InvoicesPage mounted, auth state:", { isAuthenticated, isLoading });
     if (isAuthenticated) {
       fetchInvoices();
     }
   }, [isAuthenticated, fetchInvoices]);
   
   if (isLoading) {
+    console.log("InvoicesPage: Still loading auth state...");
     return <LoadingState />;
   }
   
   if (!isAuthenticated) {
+    console.log("InvoicesPage: User not authenticated, should redirect via useAuthCheck");
     return null; // Auth check will redirect
   }
   
