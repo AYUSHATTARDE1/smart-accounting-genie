@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 export interface CompanySettings {
   id?: string;
   user_id?: string;
-  company_name: string;
+  company_name: string; // This field is required, which matches our usage
   company_logo_url?: string;
   address?: string;
   email?: string;

@@ -76,10 +76,15 @@ const PostInitialSetup = () => {
         }
       }
 
-      // Save company settings
+      // Save company settings - explicitly set company_name to ensure it's not optional
       const updatedSettings: CompanySettings = {
-        ...data,
-        company_logo_url: logoUrl,
+        company_name: data.company_name, // Explicitly set company_name to ensure it's not optional
+        address: data.address,
+        email: data.email,
+        phone: data.phone,
+        tax_id: data.tax_id,
+        business_type: data.business_type,
+        company_logo_url: logoUrl || undefined,
       };
 
       const success = await saveSettings(updatedSettings);
