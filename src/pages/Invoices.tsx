@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCompanySettings } from "@/hooks/use-company-settings";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
 
 // Create a shared authentication hook to avoid duplicate code
 const useAuthCheck = () => {
@@ -80,15 +81,9 @@ const useAuthCheck = () => {
 
 const LoadingState = () => (
   <div className="container mx-auto py-6 space-y-6">
-    <Skeleton className="h-8 w-64 mb-4" />
-    <Skeleton className="h-4 w-96 mb-6" />
-    <div className="border rounded-md p-6">
-      <Skeleton className="h-8 w-full mb-4" />
-      <div className="space-y-3">
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-12 w-full" />
-      </div>
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <span className="ml-2">Loading invoices...</span>
     </div>
   </div>
 );

@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Trash2, Edit, Eye, FileText, Plus, Download } from "lucide-react";
+import { Trash2, Edit, Eye, FileText, Plus, Download, Loader2 } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -122,13 +122,9 @@ const InvoiceList = () => {
           <Skeleton className="h-10 w-[120px]" />
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <div className="p-4">
-              <Skeleton className="h-10 w-full mb-4" />
-              <Skeleton className="h-16 w-full mb-2" />
-              <Skeleton className="h-16 w-full mb-2" />
-              <Skeleton className="h-16 w-full" />
-            </div>
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2">Loading invoices...</span>
           </div>
         </CardContent>
       </Card>
