@@ -21,6 +21,7 @@ import AppLayout from "./components/layout/AppLayout";
 import ChatInterface from "./components/ai/ChatInterface";
 import Settings from "./pages/Settings";
 import PostInitialSetup from "./pages/PostInitialSetup";
+import InitialSetup from "./pages/InitialSetup";
 import { Session } from "@supabase/supabase-js";
 
 // Create a query client with default settings
@@ -163,7 +164,7 @@ const App = () => {
     }
     
     if (hasCompletedSetup === false) {
-      return "/post-initial-setup";
+      return "/initial-setup";
     }
     
     return "/dashboard";
@@ -189,13 +190,16 @@ const App = () => {
             <Route path="/post-initial-setup" element={
               isAuthenticated ? <PostInitialSetup /> : <Navigate to="/login" />
             } />
+            <Route path="/initial-setup" element={
+              isAuthenticated ? <InitialSetup /> : <Navigate to="/login" />
+            } />
             <Route path="/calculator" element={<Calculator />} />
             <Route path="/document-upload" element={<DocumentUpload />} />
             
             {/* Protected routes - wrapped in AppLayout */}
             <Route element={
               isAuthenticated ? 
-                (hasCompletedSetup === false ? <Navigate to="/post-initial-setup" /> : <AppLayout />) 
+                (hasCompletedSetup === false ? <Navigate to="/initial-setup" /> : <AppLayout />) 
                 : <Navigate to="/login" />
             }>
               <Route path="/dashboard" element={<Dashboard />} />

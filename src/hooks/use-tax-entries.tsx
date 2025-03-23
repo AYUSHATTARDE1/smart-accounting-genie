@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./use-toast";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useCompanySettings } from "./use-company-settings";
 
 export interface TaxEntry {
   id?: string;
@@ -22,6 +23,7 @@ export const useTaxEntries = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { settings, fetchSettings } = useCompanySettings();
 
   const fetchTaxEntries = async () => {
     setIsLoading(true);
@@ -31,36 +33,13 @@ export const useTaxEntries = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // For demo purposes, create some sample data if not authenticated
-        const demoData: TaxEntry[] = [
-          {
-            id: "demo-1",
-            tax_year: 2023,
-            category: "Business Expenses",
-            amount: 1250.00,
-            description: "Office supplies and equipment",
-            date_added: "2023-06-15",
-          },
-          {
-            id: "demo-2",
-            tax_year: 2023,
-            category: "Healthcare",
-            amount: 850.50,
-            description: "Medical expenses",
-            date_added: "2023-08-22",
-          },
-          {
-            id: "demo-3",
-            tax_year: 2022,
-            category: "Charitable Donations",
-            amount: 500.00,
-            description: "Annual donation to local charity",
-            date_added: "2022-12-20",
-          }
-        ];
-        
-        setTaxEntries(demoData);
+        setTaxEntries([]);
         setIsLoading(false);
+        toast({
+          title: "Authentication required",
+          description: "Please log in to view your tax entries",
+          variant: "destructive",
+        });
         return;
       }
       
@@ -97,22 +76,12 @@ export const useTaxEntries = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // For demo: simulate creation and return
-        const newEntry: TaxEntry = {
-          ...entry,
-          id: `demo-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        
-        setTaxEntries([newEntry, ...taxEntries]);
-        
         toast({
-          title: "Demo Mode",
-          description: "Tax entry added (demo mode - not saved to database)",
+          title: "Authentication required",
+          description: "Please log in to create tax entries",
+          variant: "destructive",
         });
-        
-        return newEntry;
+        throw new Error("Authentication required");
       }
       
       const { data, error } = await supabase
@@ -159,22 +128,6 @@ export const useTaxEntries = () => {
     setError(null);
     
     try {
-      // For demo mode
-      if (entry.id.startsWith('demo-')) {
-        const updatedEntries = taxEntries.map(e => 
-          e.id === entry.id ? { ...entry, updated_at: new Date().toISOString() } : e
-        );
-        
-        setTaxEntries(updatedEntries);
-        
-        toast({
-          title: "Demo Mode",
-          description: "Tax entry updated (demo mode - not saved to database)",
-        });
-        
-        return;
-      }
-      
       const { error } = await supabase
         .from("tax_entries")
         .update({
@@ -216,18 +169,6 @@ export const useTaxEntries = () => {
     setError(null);
     
     try {
-      // For demo mode
-      if (id.startsWith('demo-')) {
-        setTaxEntries(taxEntries.filter(entry => entry.id !== id));
-        
-        toast({
-          title: "Demo Mode",
-          description: "Tax entry deleted (demo mode)",
-        });
-        
-        return;
-      }
-      
       const { error } = await supabase
         .from("tax_entries")
         .delete()
@@ -257,8 +198,13 @@ export const useTaxEntries = () => {
     }
   };
 
-  const downloadTaxReportAsPdf = (year?: number) => {
+  const downloadTaxReportAsPdf = async (year?: number) => {
     try {
+      // Ensure company settings are loaded
+      if (!settings) {
+        await fetchSettings();
+      }
+      
       let entriesToDownload = taxEntries;
       
       if (year) {
@@ -271,15 +217,69 @@ export const useTaxEntries = () => {
           description: "There are no tax entries to download.",
           variant: "destructive",
         });
-        return;
+        return false;
       }
       
       const doc = new jsPDF();
+      let yPos = 20;
+      
+      // Add company info if available
+      if (settings) {
+        // Add company logo if available
+        if (settings.company_logo_url) {
+          try {
+            // Calculate max logo dimensions for proper scaling
+            const maxLogoWidth = 60;
+            const maxLogoHeight = 30;
+            
+            // Place the logo in the top-left corner
+            doc.addImage(settings.company_logo_url, 'JPEG', 20, yPos, maxLogoWidth, maxLogoHeight, undefined, 'FAST');
+            yPos += maxLogoHeight + 10;
+          } catch (logoError) {
+            console.error("Error adding logo to PDF:", logoError);
+            // Continue without logo if there's an error
+            yPos += 10;
+          }
+        }
+        
+        // Add company name
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.text(settings.company_name || "Your Company", 20, yPos);
+        yPos += 8;
+        
+        // Add company details
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        
+        if (settings.address) {
+          doc.text(settings.address, 20, yPos);
+          yPos += 5;
+        }
+        
+        if (settings.email) {
+          doc.text(`Email: ${settings.email}`, 20, yPos);
+          yPos += 5;
+        }
+        
+        if (settings.phone) {
+          doc.text(`Phone: ${settings.phone}`, 20, yPos);
+          yPos += 5;
+        }
+        
+        if (settings.tax_id) {
+          doc.text(`Tax ID: ${settings.tax_id}`, 20, yPos);
+          yPos += 5;
+        }
+        
+        yPos += 10;
+      }
       
       // Add title
       doc.setFontSize(20);
       doc.setTextColor(40, 40, 40);
-      doc.text(`Tax Report ${year ? '- ' + year : ''}`, 14, 22);
+      doc.text(`Tax Report ${year ? '- ' + year : ''}`, 14, yPos);
+      yPos += 10;
       
       // Group entries by category
       const entriesByCategory: Record<string, TaxEntry[]> = {};
@@ -308,7 +308,7 @@ export const useTaxEntries = () => {
       autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
-        startY: 30,
+        startY: yPos,
         theme: 'grid',
         styles: { fontSize: 10 }
       });
@@ -342,6 +342,8 @@ export const useTaxEntries = () => {
         title: "Success",
         description: "Tax report downloaded as PDF!",
       });
+      
+      return true;
     } catch (err) {
       console.error("Error generating PDF:", err);
       toast({
@@ -349,6 +351,7 @@ export const useTaxEntries = () => {
         description: "Failed to download tax report as PDF. Please try again.",
         variant: "destructive",
       });
+      return false;
     }
   };
 

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Invoice, useInvoices } from "@/hooks/use-invoices";
-import { formatDistanceToNow } from "date-fns";
 import {
   Table,
   TableBody,
@@ -34,9 +33,11 @@ const InvoiceList = () => {
   const { invoices, isLoading, deleteInvoice, downloadInvoiceAsPdf, fetchInvoices } = useInvoices();
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [viewMode, setViewMode] = useState<"view" | "edit" | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Force a refresh of invoices when component mounts
     fetchInvoices();
   }, [fetchInvoices]);
 
@@ -56,8 +57,15 @@ const InvoiceList = () => {
     }
   };
 
-  const handleDownload = (invoice: Invoice) => {
-    downloadInvoiceAsPdf(invoice);
+  const handleDownload = async (invoice: Invoice) => {
+    if (invoice.id) {
+      setDownloadingId(invoice.id);
+      try {
+        await downloadInvoiceAsPdf(invoice);
+      } finally {
+        setDownloadingId(null);
+      }
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -207,8 +215,13 @@ const InvoiceList = () => {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDownload(invoice)}
+                          disabled={downloadingId === invoice.id}
                         >
-                          <Download size={16} />
+                          {downloadingId === invoice.id ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                          ) : (
+                            <Download size={16} />
+                          )}
                           <span className="sr-only">Download</span>
                         </Button>
                         <Button
