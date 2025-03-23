@@ -19,12 +19,18 @@ export interface CompanySettings {
 export const useCompanySettings = () => {
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchSettings = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw userError;
+      }
       
       if (!user) {
         console.log("No authenticated user found");
@@ -37,7 +43,7 @@ export const useCompanySettings = () => {
         .from("business_profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
       
       if (error && error.code !== 'PGRST116') {
         throw error;
@@ -60,6 +66,7 @@ export const useCompanySettings = () => {
       return data;
     } catch (error) {
       console.error("Error fetching company settings:", error);
+      setError("Failed to load company settings");
       toast({
         title: "Error",
         description: "Failed to load company settings",
@@ -71,9 +78,46 @@ export const useCompanySettings = () => {
     }
   };
 
-  const uploadLogo = async (file: File): Promise<string | null> => {
+  const ensureBucketExists = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: buckets, error: bucketListError } = await supabase.storage.listBuckets();
+      
+      if (bucketListError) {
+        console.error("Error listing buckets:", bucketListError);
+        return false;
+      }
+      
+      const bucketName = 'company-assets';
+      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      
+      if (!bucketExists) {
+        console.log(`Creating ${bucketName} bucket`);
+        const { error: createBucketError } = await supabase.storage.createBucket(bucketName, {
+          public: true,
+          fileSizeLimit: 5242880, // 5MB
+        });
+        
+        if (createBucketError) {
+          console.error("Error creating bucket:", createBucketError);
+          throw createBucketError;
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error checking/creating bucket:", error);
+      return false;
+    }
+  };
+
+  const uploadLogo = async (file: File): Promise<string | null> => {
+    setError(null);
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw userError;
+      }
       
       if (!user) {
         toast({
@@ -84,33 +128,17 @@ export const useCompanySettings = () => {
         return null;
       }
       
+      // Ensure the bucket exists
+      const bucketReady = await ensureBucketExists();
+      if (!bucketReady) {
+        throw new Error("Could not create or access storage bucket");
+      }
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${uuidv4()}.${fileExt}`;
       const filePath = `${fileName}`;
       
       console.log("Uploading logo to path:", filePath);
-      
-      // Ensure the bucket exists
-      try {
-        const { data: buckets } = await supabase.storage.listBuckets();
-        const bucketExists = buckets?.some(bucket => bucket.name === 'company-assets');
-        
-        if (!bucketExists) {
-          console.log("Creating company-assets bucket");
-          // Create the bucket
-          const { error: createBucketError } = await supabase.storage.createBucket('company-assets', {
-            public: true,
-            fileSizeLimit: 5242880, // 5MB
-          });
-          
-          if (createBucketError) {
-            console.error("Error creating bucket:", createBucketError);
-            throw createBucketError;
-          }
-        }
-      } catch (bucketError) {
-        console.error("Error checking/creating bucket:", bucketError);
-      }
       
       // Upload the file
       const { error: uploadError } = await supabase.storage
@@ -136,6 +164,7 @@ export const useCompanySettings = () => {
       return urlData.publicUrl;
     } catch (error) {
       console.error("Error uploading logo:", error);
+      setError("Could not upload company logo");
       toast({
         title: "Upload failed",
         description: "Could not upload company logo",
@@ -147,9 +176,19 @@ export const useCompanySettings = () => {
 
   const saveSettings = async (updatedSettings: CompanySettings): Promise<boolean> => {
     setIsLoading(true);
+    setError(null);
     try {
       console.log("Saving settings:", updatedSettings);
-      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!updatedSettings.company_name) {
+        throw new Error("Company name is required");
+      }
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        throw userError;
+      }
       
       if (!user) {
         toast({
@@ -163,11 +202,11 @@ export const useCompanySettings = () => {
       const profileData = {
         user_id: user.id,
         business_name: updatedSettings.company_name,
-        logo_url: updatedSettings.company_logo_url,
-        address: updatedSettings.address,
-        email: updatedSettings.email,
-        phone: updatedSettings.phone,
-        tax_id: updatedSettings.tax_id,
+        logo_url: updatedSettings.company_logo_url || "",
+        address: updatedSettings.address || "",
+        email: updatedSettings.email || "",
+        phone: updatedSettings.phone || "",
+        tax_id: updatedSettings.tax_id || "",
         business_type: updatedSettings.business_type || "sole-proprietorship" // Set default value
       };
       
@@ -202,9 +241,10 @@ export const useCompanySettings = () => {
       return true;
     } catch (error) {
       console.error("Error saving company settings:", error);
+      setError("Failed to save company settings");
       toast({
         title: "Error",
-        description: "Failed to save company settings",
+        description: error.message || "Failed to save company settings",
         variant: "destructive",
       });
       return false;
@@ -214,12 +254,15 @@ export const useCompanySettings = () => {
   };
 
   useEffect(() => {
+    // Create bucket on initial load to avoid issues later
+    ensureBucketExists();
     fetchSettings();
   }, []);
 
   return {
     settings,
     isLoading,
+    error,
     fetchSettings,
     uploadLogo,
     saveSettings

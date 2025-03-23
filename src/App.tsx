@@ -38,82 +38,93 @@ const App = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [hasCompletedSetup, setHasCompletedSetup] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Improved auth state management to persist sessions
   useEffect(() => {
-    // First check for existing session
-    const checkSession = async () => {
-      try {
-        console.log("Checking session...");
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error("Error checking session:", error);
-          setIsAuthLoading(false);
-          return;
-        }
-        
-        console.log("Session data:", data.session ? "Session exists" : "No session");
-        setSession(data.session);
-        
-        if (data.session) {
-          await checkCompletedSetup(data.session.user.id);
-        } else {
-          setHasCompletedSetup(null);
-          setIsAuthLoading(false);
-        }
-      } catch (err) {
-        console.error("Session check failed:", err);
-        setIsAuthLoading(false);
-      }
-    };
-    
-    const checkCompletedSetup = async (userId: string) => {
-      try {
-        console.log("Checking if user has completed setup...");
-        const { data, error } = await supabase
-          .from("business_profiles")
-          .select("id")
-          .eq("user_id", userId)
-          .maybeSingle();
+    try {
+      // First set up the auth state listener
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, currentSession) => {
+          console.log("Auth state changed:", event);
+          setSession(currentSession);
 
-        if (error) {
-          console.error("Error checking business profile:", error);
-          setHasCompletedSetup(false);
-        } else {
-          setHasCompletedSetup(!!data);
+          if (currentSession) {
+            checkCompletedSetup(currentSession.user.id);
+          } else {
+            setHasCompletedSetup(null);
+            setIsAuthLoading(false);
+          }
         }
-        
-        setIsAuthLoading(false);
-      } catch (err) {
-        console.error("Profile check failed:", err);
-        setHasCompletedSetup(false);
-        setIsAuthLoading(false);
-      }
-    };
-    
-    // Then set up the auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        console.log("Auth state changed:", event);
-        setSession(currentSession);
+      );
 
-        if (currentSession) {
-          checkCompletedSetup(currentSession.user.id);
-        } else {
-          setHasCompletedSetup(null);
+      // Then check for existing session
+      const checkSession = async () => {
+        try {
+          console.log("Checking session...");
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error("Error checking session:", error);
+            setError("Error checking authentication session");
+            setIsAuthLoading(false);
+            return;
+          }
+          
+          console.log("Session data:", data.session ? "Session exists" : "No session");
+          setSession(data.session);
+          
+          if (data.session) {
+            await checkCompletedSetup(data.session.user.id);
+          } else {
+            setHasCompletedSetup(null);
+            setIsAuthLoading(false);
+          }
+        } catch (err) {
+          console.error("Session check failed:", err);
+          setError("Failed to check authentication status");
           setIsAuthLoading(false);
         }
-      }
-    );
-    
-    checkSession();
-    
-    // Cleanup subscription on unmount
-    return () => {
-      subscription?.unsubscribe();
-    };
+      };
+      
+      checkSession();
+      
+      // Cleanup subscription on unmount
+      return () => {
+        subscription?.unsubscribe();
+      };
+    } catch (e) {
+      console.error("Critical error in auth setup:", e);
+      setError("Failed to initialize authentication");
+      setIsAuthLoading(false);
+    }
   }, []);
+
+  const checkCompletedSetup = async (userId: string) => {
+    try {
+      console.log("Checking if user has completed setup...");
+      const { data, error } = await supabase
+        .from("business_profiles")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error checking business profile:", error);
+        setError("Error checking business profile");
+        setHasCompletedSetup(false);
+      } else {
+        setHasCompletedSetup(!!data);
+      }
+      
+      setIsAuthLoading(false);
+    } catch (err) {
+      console.error("Profile check failed:", err);
+      setError("Failed to check account setup status");
+      setHasCompletedSetup(false);
+      setIsAuthLoading(false);
+    }
+  };
 
   // Show loading state while checking auth
   if (isAuthLoading) {
@@ -121,6 +132,24 @@ const App = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
         <p className="ml-2">Loading...</p>
+      </div>
+    );
+  }
+
+  // Show error state if there was a problem
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="bg-destructive/10 p-4 rounded-lg mb-4">
+          <h2 className="text-lg font-semibold text-destructive mb-2">Error Loading Application</h2>
+          <p className="text-sm">{error}</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90"
+        >
+          Refresh Page
+        </button>
       </div>
     );
   }
