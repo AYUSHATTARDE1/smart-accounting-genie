@@ -32,6 +32,7 @@ export const useCompanySettings = () => {
         return null;
       }
       
+      console.log("Fetching settings for user:", user.id);
       const { data, error } = await supabase
         .from("business_profiles")
         .select("*")
@@ -41,6 +42,8 @@ export const useCompanySettings = () => {
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
+      
+      console.log("Fetched settings:", data);
       
       setSettings(data ? {
         id: data.id,
@@ -85,12 +88,15 @@ export const useCompanySettings = () => {
       const fileName = `${user.id}/${uuidv4()}.${fileExt}`;
       const filePath = `${fileName}`;
       
-      // Create the bucket if it doesn't exist
+      console.log("Uploading logo to path:", filePath);
+      
+      // Ensure the bucket exists
       try {
         const { data: buckets } = await supabase.storage.listBuckets();
         const bucketExists = buckets?.some(bucket => bucket.name === 'company-assets');
         
         if (!bucketExists) {
+          console.log("Creating company-assets bucket");
           // Create the bucket
           const { error: createBucketError } = await supabase.storage.createBucket('company-assets', {
             public: true,
@@ -115,12 +121,17 @@ export const useCompanySettings = () => {
         });
       
       if (uploadError) {
+        console.error("Error uploading file:", uploadError);
         throw uploadError;
       }
+      
+      console.log("File uploaded successfully");
       
       const { data: urlData } = supabase.storage
         .from('company-assets')
         .getPublicUrl(filePath);
+      
+      console.log("Generated public URL:", urlData.publicUrl);
       
       return urlData.publicUrl;
     } catch (error) {
@@ -137,6 +148,7 @@ export const useCompanySettings = () => {
   const saveSettings = async (updatedSettings: CompanySettings): Promise<boolean> => {
     setIsLoading(true);
     try {
+      console.log("Saving settings:", updatedSettings);
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -175,8 +187,11 @@ export const useCompanySettings = () => {
       }
       
       if (result.error) {
+        console.error("Error saving settings:", result.error);
         throw result.error;
       }
+      
+      console.log("Settings saved successfully");
       
       toast({
         title: "Settings saved",

@@ -23,6 +23,7 @@ import Settings from "./pages/Settings";
 import PostInitialSetup from "./pages/PostInitialSetup";
 import { Session } from "@supabase/supabase-js";
 
+// Create a query client with default settings
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -40,44 +41,36 @@ const App = () => {
 
   // Improved auth state management to persist sessions
   useEffect(() => {
-    // First set up the auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        console.log("Auth state changed:", event);
-        setSession(currentSession);
-
-        if (currentSession) {
-          checkCompletedSetup(currentSession.user.id);
-        } else {
-          setHasCompletedSetup(null);
-        }
-        
-        // Don't set isAuthLoading to false here, wait for the checkSession call
-      }
-    );
-    
-    // Then check for existing session
+    // First check for existing session
     const checkSession = async () => {
       try {
+        console.log("Checking session...");
         const { data, error } = await supabase.auth.getSession();
+        
         if (error) {
           console.error("Error checking session:", error);
+          setIsAuthLoading(false);
+          return;
         }
         
+        console.log("Session data:", data.session ? "Session exists" : "No session");
         setSession(data.session);
         
         if (data.session) {
           await checkCompletedSetup(data.session.user.id);
+        } else {
+          setHasCompletedSetup(null);
+          setIsAuthLoading(false);
         }
       } catch (err) {
         console.error("Session check failed:", err);
-      } finally {
         setIsAuthLoading(false);
       }
     };
     
     const checkCompletedSetup = async (userId: string) => {
       try {
+        console.log("Checking if user has completed setup...");
         const { data, error } = await supabase
           .from("business_profiles")
           .select("id")
@@ -87,15 +80,32 @@ const App = () => {
         if (error) {
           console.error("Error checking business profile:", error);
           setHasCompletedSetup(false);
-          return;
+        } else {
+          setHasCompletedSetup(!!data);
         }
-
-        setHasCompletedSetup(!!data);
+        
+        setIsAuthLoading(false);
       } catch (err) {
         console.error("Profile check failed:", err);
         setHasCompletedSetup(false);
+        setIsAuthLoading(false);
       }
     };
+    
+    // Then set up the auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, currentSession) => {
+        console.log("Auth state changed:", event);
+        setSession(currentSession);
+
+        if (currentSession) {
+          checkCompletedSetup(currentSession.user.id);
+        } else {
+          setHasCompletedSetup(null);
+          setIsAuthLoading(false);
+        }
+      }
+    );
     
     checkSession();
     
